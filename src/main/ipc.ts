@@ -59,7 +59,14 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
   ipcMain.handle('save', (_e, cfg: VmConfig, previousName?: string) => {
     const saved = saveConfig(paths, cfg, previousName)
     // labels and screenshots are kept by VM name, so they have to move along
-    if (previousName && previousName !== saved.name) profiles.rename(previousName, saved.name)
+    if (previousName && previousName !== saved.name) {
+      try {
+        profiles.rename(previousName, saved.name)
+      } catch (e) {
+        // the config is already saved, a stuck screenshot folder shouldn't make that look failed
+        console.warn(`could not move the profiles of ${previousName}:`, e)
+      }
+    }
     return saved
   })
 
