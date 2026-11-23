@@ -70,12 +70,19 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     return saved
   })
 
+  // a profile save leaves the VM off for a while before booting it again
+  const notMidProfile = (name: string) => {
+    if (profiles.isBusy(name)) throw new Error(`${name} is busy with a profile. Wait for it to finish.`)
+  }
+
   ipcMain.handle('remove', (_e, name: string) => {
+    notMidProfile(name)
     if (runner.state(name).status !== 'off') throw new Error('Turn the VM off before deleting it')
     deleteConfig(paths, name) // the disk file is kept on purpose
   })
 
   ipcMain.handle('start', async (_e, name: string, opts?: { resume?: boolean }): Promise<StartResult> => {
+    notMidProfile(name)
     const cfg = byName(name)
     if (opts?.resume === true && (await runner.hasSaveState(cfg))) {
       await runner.start(cfg, { loadState: QUICKSAVE })

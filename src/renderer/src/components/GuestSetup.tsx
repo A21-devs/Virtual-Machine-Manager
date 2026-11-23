@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { VmConfig } from '@shared/config'
 import Modal from './Modal'
 
-/** Shown when Save state runs on a guest that can't hibernate itself yet. */
+/** Shown when Save state or a profile save runs on a guest that can't hibernate itself yet. */
 export default function GuestSetup({ vm, reason, onClose }: { vm: VmConfig; reason: string; onClose: () => void }) {
   const [cmd, setCmd] = useState('')
   const linux = vm.os === 'linux'
@@ -14,7 +14,7 @@ export default function GuestSetup({ vm, reason, onClose }: { vm: VmConfig; reas
 
   return (
     <Modal
-      title={`Set up Save state in ${vm.name}`}
+      title={`Set up hibernate in ${vm.name}`}
       onClose={onClose}
       width={560}
       footer={

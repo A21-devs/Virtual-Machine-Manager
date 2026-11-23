@@ -81,7 +81,9 @@ describe.skipIf(!qemu)('profiles with real QEMU', () => {
     // launch while off: rolls back and boots. A second call meanwhile is refused.
     const launching = profiles.launch(cfg, 'first', false)
     await expect(profiles.remove(cfg, 'second')).rejects.toThrow(/still busy/)
+    expect(profiles.isBusy(cfg.name)).toBe(true)
     await launching
+    expect(profiles.isBusy(cfg.name)).toBe(false)
     await waitFor(runner, cfg.name, 'running')
     await expect(profiles.restore(cfg, 'second')).rejects.toThrow(/Power off/)
     // launch while on needs force, then turns it off first

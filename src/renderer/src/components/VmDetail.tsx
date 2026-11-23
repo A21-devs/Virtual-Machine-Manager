@@ -4,6 +4,8 @@ import type { HostInfo, VmStatus } from '@shared/ipc'
 import OsMark from './OsMark'
 import Hardware from './Hardware'
 import LogView from './LogView'
+import Profiles from './Profiles'
+import type { PushToast } from './Toasts'
 import { errText, fileName, gb, statusLabel } from '../util'
 
 interface Props {
@@ -15,11 +17,20 @@ interface Props {
   onCancelDraft: () => void
   onDelete: (name: string) => void
   onDirtyChange: (dirty: boolean) => void
+  toast: PushToast
+  onNeedsSetup: (reason: string) => void
 }
 
-type Tab = 'summary' | 'hardware' | 'log'
+type Tab = 'summary' | 'hardware' | 'profiles' | 'log'
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'summary', label: 'Summary' },
+  { id: 'hardware', label: 'Hardware' },
+  { id: 'profiles', label: 'Profiles' },
+  { id: 'log', label: 'Log' }
+]
 
-export default function VmDetail({ vm, isDraft, status, host, onSave, onCancelDraft, onDelete, onDirtyChange }: Props) {
+export default function VmDetail(props: Props) {
+  const { vm, isDraft, status, host, onSave, onCancelDraft, onDelete, onDirtyChange } = props
   const [tab, setTab] = useState<Tab>(isDraft ? 'hardware' : 'summary')
   const [form, setForm] = useState<VmConfig>(vm)
   useEffect(() => setForm(vm), [vm])
@@ -46,17 +57,17 @@ export default function VmDetail({ vm, isDraft, status, host, onSave, onCancelDr
       </div>
 
       <nav className="tabs" role="tablist">
-        {(['summary', 'hardware', 'log'] as const).map((t) => (
+        {TABS.map((t) => (
           <button
-            key={t}
+            key={t.id}
             role="tab"
-            aria-selected={tab === t}
-            className={tab === t ? 'tab active' : 'tab'}
-            disabled={isDraft && t !== 'hardware'}
-            onClick={() => setTab(t)}
+            aria-selected={tab === t.id}
+            className={tab === t.id ? 'tab active' : 'tab'}
+            disabled={isDraft && t.id !== 'hardware'}
+            onClick={() => setTab(t.id)}
           >
-            {t === 'summary' ? 'Summary' : t === 'hardware' ? 'Hardware' : 'Log'}
-            {t === 'hardware' && dirty && !isDraft && <span className="tab-dot" aria-label="unsaved changes" />}
+            {t.label}
+            {t.id === 'hardware' && dirty && !isDraft && <span className="tab-dot" aria-label="unsaved changes" />}
           </button>
         ))}
       </nav>
@@ -78,6 +89,7 @@ export default function VmDetail({ vm, isDraft, status, host, onSave, onCancelDr
             onDelete={() => onDelete(vm.name)}
           />
         )}
+        {tab === 'profiles' && <Profiles vm={vm} status={status} toast={props.toast} onNeedsSetup={props.onNeedsSetup} />}
         {tab === 'log' && <LogView name={vm.name} status={status} />}
       </div>
     </main>

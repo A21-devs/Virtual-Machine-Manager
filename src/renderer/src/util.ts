@@ -15,3 +15,6 @@ export const statusLabel = {
   running: 'Running',
   paused: 'Paused'
 } as const
+
+export const when = (ms: number) =>
+  new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
