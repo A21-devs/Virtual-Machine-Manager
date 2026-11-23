@@ -4,12 +4,11 @@ import { createServer } from 'node:net'
 import { constants, setPriority } from 'node:os'
 import { dirname, join } from 'node:path'
 import { EventEmitter } from 'node:events'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import type { VmConfig } from '@shared/config'
 import { buildQemuArgs } from '@shared/qemuArgs'
 import type { VmRuntimeState, VmStatus } from '@shared/ipc'
 import { QmpClient } from './qmp'
+import { QemuImg } from './qemuImg'
 import { detectAccel, qemuImgFor, qemuShareFor, type DataPaths } from './paths'
 
 interface Running {
@@ -18,9 +17,22 @@ interface Running {
   qmpError: string | null
   status: VmStatus
   startedAt: number
+  accel: 'whpx' | 'tcg'
+  agentPort: number
+  /** set when we asked QEMU to go away on purpose (save state), so it isn't reported as a crash */
+  expectedExit: boolean
 }
 
-const execFileAsync = promisify(execFile)
+/** Internal snapshot name used for the one-click save state. */
+export const QUICKSAVE = 'vmm-quicksave'
+
+const NO_QEMU = "QEMU was not found. Install it or put it in the data folder's qemu\\ directory."
+
+/** HMP commands report failure as text in a successful reply. */
+function hmpCheck(out: string): string {
+  if (/^\s*Error/im.test(out)) throw new Error(out.trim().replace(/^Error:\s*/i, ''))
+  return out
+}
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -44,6 +56,12 @@ export class VmRunner extends EventEmitter {
     super()
   }
 
+  img(): QemuImg {
+    const q = this.qemu()
+    if (!q) throw new Error(NO_QEMU)
+    return new QemuImg(qemuImgFor(q))
+  }
+
   state(name: string): VmRuntimeState {
     const r = this.running.get(name)
     return r ? { name, status: r.status, pid: r.proc.pid ?? null, startedAt: r.startedAt } : { name, status: 'off', pid: null, startedAt: null }
@@ -57,6 +75,14 @@ export class VmRunner extends EventEmitter {
     return this.running.get(name)?.qmp ?? null
   }
 
+  isRunning(name: string): boolean {
+    return this.running.has(name)
+  }
+
+  accelOf(name: string): 'whpx' | 'tcg' | null {
+    return this.running.get(name)?.accel ?? null
+  }
+
   private setStatus(name: string, status: VmStatus): void {
     const r = this.running.get(name)
     if (r) r.status = status
@@ -66,18 +92,18 @@ export class VmRunner extends EventEmitter {
   async start(cfg: VmConfig, opts: { loadState?: string } = {}): Promise<void> {
     if (this.running.has(cfg.name)) throw new Error(`${cfg.name} is already running`)
     const qemu = this.qemu()
-    if (!qemu) throw new Error('QEMU was not found. Install it or put it in the data folder\'s qemu\\ directory.')
+    if (!qemu) throw new Error(NO_QEMU)
 
-    if (!existsSync(cfg.diskPath)) {
-      await execFileAsync(qemuImgFor(qemu), ['create', '-f', 'qcow2', cfg.diskPath, `${cfg.diskSizeGB}G`], { windowsHide: true })
-    }
+    if (!existsSync(cfg.diskPath)) await this.img().create(cfg.diskPath, cfg.diskSizeGB)
 
     const accel = cfg.accel === 'auto' ? await detectAccel(qemu) : cfg.accel
     const qmpPort = await freePort()
+    const agentPort = await freePort()
     const args = buildQemuArgs(cfg, {
       accel,
       qemuShareDir: qemuShareFor(qemu),
       qmpPort,
+      agentPort,
       loadState: opts.loadState,
       isoExists: Boolean(cfg.iso) && existsSync(cfg.iso)
     })
@@ -89,7 +115,7 @@ export class VmRunner extends EventEmitter {
     proc.stdout?.pipe(log, { end: false })
     proc.stderr?.pipe(log, { end: false })
 
-    const entry: Running = { proc, qmp: null, qmpError: null, status: 'starting', startedAt: Date.now() }
+    const entry: Running = { proc, qmp: null, qmpError: null, status: 'starting', startedAt: Date.now(), accel, agentPort, expectedExit: false }
     this.running.set(cfg.name, entry)
     this.setStatus(cfg.name, 'starting')
 
@@ -102,7 +128,7 @@ export class VmRunner extends EventEmitter {
       log.end()
       this.setStatus(cfg.name, 'off')
       // died during boot = config problem, tell the UI why
-      if (Date.now() - entry.startedAt < 3000 && code !== 0) {
+      if (!entry.expectedExit && Date.now() - entry.startedAt < 3000 && code !== 0) {
         this.emit('crash', { name: cfg.name, message: stderr.trim() || `QEMU exited with code ${code}` })
       }
     })
@@ -124,7 +150,9 @@ export class VmRunner extends EventEmitter {
         if (ev === 'STOP') this.setStatus(cfg.name, 'paused')
         if (ev === 'RESUME') this.setStatus(cfg.name, 'running')
       })
-      this.setStatus(cfg.name, 'running')
+      // -loadvm can leave the VM stopped, so ask QEMU instead of assuming
+      const st = await qmp.execute<{ running: boolean }>('query-status').catch(() => ({ running: true }))
+      this.setStatus(cfg.name, st.running ? 'running' : 'paused')
     } catch (err) {
       // QEMU may have died already, the exit handler reports that.
       // If it's still up we just can't control it, remember why for the power buttons.
@@ -162,5 +190,57 @@ export class VmRunner extends EventEmitter {
 
   killAll(): void {
     for (const name of this.running.keys()) this.kill(name)
+  }
+
+  /** resolves true when the VM's process is gone (right away if it isn't running), false on timeout */
+  waitForExit(name: string, timeoutMs: number): Promise<boolean> {
+    const r = this.running.get(name)
+    if (!r) return Promise.resolve(true)
+    return new Promise((resolve) => {
+      const t = setTimeout(() => resolve(false), timeoutMs)
+      r.proc.once('exit', () => {
+        clearTimeout(t)
+        resolve(true)
+      })
+    })
+  }
+
+  /**
+   * Saves RAM + disk into the qcow2 as QUICKSAVE and quits. Only works without WHPX:
+   * QEMU's WHPX backend blocks migration ("missing dirty memory tracking support"),
+   * and savevm is built on migration.
+   */
+  async saveAndQuit(name: string): Promise<void> {
+    const r = this.running.get(name)
+    if (!r) throw new Error(`${name} is not running`)
+    if (r.accel === 'whpx') throw new Error('QEMU cannot save RAM state while using WHPX acceleration.')
+    const qmp = this.need(name)
+    hmpCheck(await qmp.hmp(`savevm ${QUICKSAVE}`))
+    r.expectedExit = true
+    await qmp.execute('quit').catch(() => undefined)
+    if (!(await this.waitForExit(name, 10_000))) r.proc.kill()
+  }
+
+  /** drops an internal snapshot from a running VM's disk (used to throw away a save state once it's loaded) */
+  async deleteSnapshotLive(name: string, tag: string): Promise<void> {
+    await this.need(name).execute('blockdev-snapshot-delete-internal-sync', { device: 'disk0', name: tag })
+  }
+
+  /** whether the VM's disk holds a save state. -U reads it even while QEMU has it open. */
+  async hasSaveState(cfg: VmConfig): Promise<boolean> {
+    if (!existsSync(cfg.diskPath)) return false
+    return (await this.img().info(cfg.diskPath)).snapshots.some((s) => s.name === QUICKSAVE)
+  }
+
+  agentPortOf(name: string): number {
+    const r = this.running.get(name)
+    if (!r) throw new Error(`${name} is not running`)
+    return r.agentPort
+  }
+
+  /** the guest is about to power itself off (hibernating), don't report that as a crash */
+  markExpectedExit(name: string): void {
+    const r = this.running.get(name)
+    if (r) r.expectedExit = true
   }
 }
