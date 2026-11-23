@@ -1,0 +1,29 @@
+:root {
+  --bg: #1b1b1c;
+  --text: #ececee;
+  --text-3: #7e7e86;
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; height: 100%; }
+
+.app { display: flex; flex-direction: column; height: 100%; }
+
+.titlebar {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--text-3);
+  -webkit-app-region: drag;
+}
+
+.empty { flex: 1; display: grid; place-content: center; text-align: center; color: var(--text-3); }
+.empty p { margin: 0; }
+.empty-title { color: var(--text); font-size: 15px; font-weight: 600; }
