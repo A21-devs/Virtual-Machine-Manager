@@ -59,6 +59,7 @@ export function installMockApi(): void {
     },
     hasSaveState: async (name) => saved.has(name),
     discardSaveState: async (name) => void saved.delete(name),
+    guestSetupCommand: async () => 'curl -sL 10.0.2.2:7777/s | sudo bash',
     openDataFolder: async () => undefined,
     openLog: async () => undefined,
     readLog: async (name) => `> qemu-system-x86_64.exe -name ${name} -machine q35,accel=whpx,kernel-irqchip=off ...`,

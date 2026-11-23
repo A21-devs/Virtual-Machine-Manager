@@ -21,8 +21,11 @@ export interface HostInfo {
 
 export type PowerAction = 'pause' | 'resume' | 'reset' | 'shutdown' | 'kill'
 
-/** savevm: RAM written into the qcow2 (TCG only). hibernate: the guest saves itself and powers off (WHPX). */
-export type SaveStateResult = { method: 'savevm' } | { method: 'hibernate' }
+/**
+ * savevm: RAM written into the qcow2 (TCG only). hibernate: the guest saves itself and powers off (WHPX).
+ * needs-setup: the guest agent didn't answer, the guest needs the one-time setup first.
+ */
+export type SaveStateResult = { method: 'savevm' } | { method: 'hibernate' } | { method: 'needs-setup'; reason: string }
 
 /** resumed: a save state was loaded. warning: something the user has to know about (it's still running) */
 export interface StartResult {
@@ -44,6 +47,8 @@ export interface VmmApi {
   saveState(name: string): Promise<SaveStateResult>
   hasSaveState(name: string): Promise<boolean>
   discardSaveState(name: string): Promise<void>
+  /** the command to type into a Linux guest once so Save state (hibernate) works there */
+  guestSetupCommand(): Promise<string>
   openDataFolder(): Promise<void>
   openLog(name: string): Promise<void>
   readLog(name: string): Promise<string>
