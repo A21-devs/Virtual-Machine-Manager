@@ -59,6 +59,11 @@ export class Profiles {
     }
   }
 
+  /** true while a take/launch/remove runs for this VM. The VM can be off in the middle of one. */
+  isBusy(vm: string): boolean {
+    return this.busy.has(vm)
+  }
+
   private shotFile(vm: string, tag: string): string {
     checkTag(tag)
     return join(this.dir(vm), `${tag}.png`)
