@@ -50,8 +50,14 @@ else
 fi
 
 echo "==> Telling the kernel where to resume from"
-sed -i -E 's/ ?resume(_offset)?=[^ "]*//g' /etc/default/grub
-sed -i -E "s/^(GRUB_CMDLINE_LINUX_DEFAULT=\")/\1$resume_args /" /etc/default/grub
+sed -i -E "s/ ?resume(_offset)?=[^ \"']*//g" /etc/default/grub
+# the value can be in double or single quotes
+sed -i -E "s/^(GRUB_CMDLINE_LINUX_DEFAULT=[\"'])/\1$resume_args /" /etc/default/grub
+if ! grep -qE "^GRUB_CMDLINE_LINUX_DEFAULT=[\"']$resume_args" /etc/default/grub; then
+  echo "Couldn't add '$resume_args' to GRUB_CMDLINE_LINUX_DEFAULT in /etc/default/grub."
+  echo "Add it there by hand and run update-grub, otherwise the VM can't resume after Save state."
+  exit 1
+fi
 
 # power off at the end of hibernation instead of using ACPI S4, which some VMs lack
 mkdir -p /etc/systemd/sleep.conf.d

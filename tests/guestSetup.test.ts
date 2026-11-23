@@ -18,3 +18,13 @@ describe('guest setup server', () => {
     expect((await fetch(`http://127.0.0.1:${port}/other`)).status).toBe(404)
   })
 })
+
+describe('guest setup server, overlapping calls', () => {
+  const srv = new GuestSetupServer()
+  afterEach(() => srv.close())
+
+  it('shares one server between calls that overlap', async () => {
+    const [a, b] = await Promise.all([srv.command(), srv.command()])
+    expect(a).toBe(b)
+  })
+})

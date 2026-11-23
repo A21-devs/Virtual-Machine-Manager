@@ -8,10 +8,18 @@ import script from '../../resources/guest/setup-save-state.sh?raw'
  */
 export class GuestSetupServer {
   private server: Server | null = null
-  private port = 0
+  /** cached so overlapping calls share one server instead of each making their own */
+  private starting: Promise<number> | null = null
 
-  async start(): Promise<number> {
-    if (this.server) return this.port
+  start(): Promise<number> {
+    this.starting ??= this.listen().catch((e) => {
+      this.starting = null
+      throw e
+    })
+    return this.starting
+  }
+
+  private async listen(): Promise<number> {
     const server = createServer((req, res) => {
       if (req.method === 'GET' && (req.url === '/s' || req.url === '/setup-save-state.sh')) {
         res.writeHead(200, { 'Content-Type': 'text/x-shellscript; charset=utf-8' })
@@ -29,8 +37,7 @@ export class GuestSetupServer {
     await listen(7777).catch(() => listen(0))
     server.unref() // never what keeps the app from quitting
     this.server = server
-    this.port = (server.address() as { port: number }).port
-    return this.port
+    return (server.address() as { port: number }).port
   }
 
   async command(): Promise<string> {
@@ -41,5 +48,6 @@ export class GuestSetupServer {
   close(): void {
     this.server?.close()
     this.server = null
+    this.starting = null
   }
 }
