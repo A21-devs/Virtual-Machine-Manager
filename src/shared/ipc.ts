@@ -33,6 +33,22 @@ export interface StartResult {
   warning?: string
 }
 
+/**
+ * A named save point ("profile"), stored as an internal qcow2 snapshot.
+ * session = taken while running: the guest hibernated first, so launching it brings back
+ *           everything that was open.
+ * full = has QEMU memory in it (savevm, only possible without WHPX).
+ * disk = plain disk snapshot, launching it cold boots that disk.
+ */
+export interface Profile {
+  tag: string
+  label: string
+  note: string
+  created: number
+  kind: 'disk' | 'full' | 'session'
+  hasShot: boolean
+}
+
 /** Everything the renderer can call. Implemented in main/ipc.ts, exposed in preload. */
 export interface VmmApi {
   host(): Promise<HostInfo>

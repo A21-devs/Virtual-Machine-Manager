@@ -10,6 +10,8 @@ export interface DataPaths {
   isos: string
   logs: string
   qemuDir: string
+  /** profile labels, notes and screenshots, one folder per VM */
+  profiles: string
 }
 
 export function dataPaths(root = join(homedir(), 'VMs')): DataPaths {
@@ -19,9 +21,10 @@ export function dataPaths(root = join(homedir(), 'VMs')): DataPaths {
     disks: join(root, 'disks'),
     isos: join(root, 'ISOs'),
     logs: join(root, 'logs'),
-    qemuDir: join(root, 'qemu')
+    qemuDir: join(root, 'qemu'),
+    profiles: join(root, 'profiles')
   }
-  for (const d of [p.root, p.vms, p.disks, p.isos, p.logs]) {
+  for (const d of [p.root, p.vms, p.disks, p.isos, p.logs, p.profiles]) {
     if (!existsSync(d)) mkdirSync(d, { recursive: true })
   }
   return p
