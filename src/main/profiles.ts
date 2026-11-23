@@ -17,6 +17,19 @@ type MetaFile = Record<string, Meta>
 
 /** how long a guest gets to write its memory to disk and power off */
 const HIBERNATE_TIMEOUT_MS = 5 * 60_000
+const MAX_LABEL = 80
+
+/** Tags end up in file names, so anything that could step out of the profiles folder is refused. */
+function checkTag(tag: string): void {
+  if (typeof tag !== 'string' || !tag || /[\\/]|\.\./.test(tag)) throw new Error('Bad profile id')
+}
+
+function cleanLabel(label: string): string {
+  const clean = label.trim()
+  if (!clean) throw new Error('Give the profile a name')
+  if (clean.length > MAX_LABEL) throw new Error(`Profile name is too long (${MAX_LABEL} max)`)
+  return clean
+}
 
 /** Profiles are internal qcow2 snapshots. Labels, notes and screenshots live next to them in profiles/<vm>/. */
 export class Profiles {
@@ -30,6 +43,7 @@ export class Profiles {
   }
 
   private shotFile(vm: string, tag: string): string {
+    checkTag(tag)
     return join(this.dir(vm), `${tag}.png`)
   }
 
@@ -72,10 +86,11 @@ export class Profiles {
    * that disk captures the whole session, and booting the snapshot later resumes it.
    */
   async take(cfg: VmConfig, label: string, note: string): Promise<Profile> {
-    const clean = label.trim()
-    if (!clean) throw new Error('Give the profile a name')
-    if (clean.length > 80) throw new Error('Profile name is too long (80 max)')
-    if (!this.runner.isRunning(cfg.name)) throw new Error('Power the VM on to save a profile of it')
+    const clean = cleanLabel(label)
+    const status = this.runner.state(cfg.name).status
+    if (status === 'off') throw new Error('Power the VM on to save a profile of it')
+    // a stopped guest can't answer the agent, and that would look like the agent is missing
+    if (status !== 'running') throw new Error('Resume the VM first, a paused guest cannot save itself')
     const tag = `p${Date.now().toString(36)}`
 
     mkdirSync(this.dir(cfg.name), { recursive: true })
@@ -89,7 +104,12 @@ export class Profiles {
     }
     this.runner.markExpectedExit(cfg.name)
     const closed = await this.runner.waitForExit(cfg.name, HIBERNATE_TIMEOUT_MS)
-    if (!closed) throw new Error(`${cfg.name} did not finish saving within 5 minutes. Check its window.`)
+    if (!closed) {
+      // still running, so a later crash should be reported again, and there's no profile for the screenshot
+      this.runner.markExpectedExit(cfg.name, false)
+      rmSync(this.shotFile(cfg.name, tag), { force: true })
+      throw new Error(`${cfg.name} did not finish saving within 5 minutes. Check its window.`)
+    }
 
     await this.runner.img().snapshotCreate(cfg.diskPath, tag)
     const meta = this.readMeta(cfg.name)
@@ -102,6 +122,7 @@ export class Profiles {
 
   /** Rolls back to the profile and boots it. A session profile resumes everything that was open. */
   async launch(cfg: VmConfig, tag: string, force: boolean): Promise<void> {
+    checkTag(tag)
     if (this.runner.isRunning(cfg.name)) {
       if (!force) throw new Error('vm-running')
       this.runner.kill(cfg.name)
@@ -126,6 +147,7 @@ export class Profiles {
   }
 
   async remove(cfg: VmConfig, tag: string): Promise<void> {
+    checkTag(tag)
     if (this.runner.isRunning(cfg.name)) await this.runner.deleteSnapshotLive(cfg.name, tag)
     else await this.runner.img().snapshotDelete(cfg.diskPath, tag)
     const meta = this.readMeta(cfg.name)
@@ -134,9 +156,10 @@ export class Profiles {
     rmSync(this.shotFile(cfg.name, tag), { force: true })
   }
 
-  edit(cfg: VmConfig, tag: string, label: string, note: string): void {
-    const clean = label.trim()
-    if (!clean) throw new Error('Give the profile a name')
+  async edit(cfg: VmConfig, tag: string, label: string, note: string): Promise<void> {
+    checkTag(tag)
+    const clean = cleanLabel(label)
+    if (!(await this.list(cfg)).some((p) => p.tag === tag)) throw new Error('That profile no longer exists on the disk')
     const meta = this.readMeta(cfg.name)
     meta[tag] = { ...meta[tag], label: clean, note: note.trim(), created: meta[tag]?.created ?? Date.now() }
     this.writeMeta(cfg.name, meta)

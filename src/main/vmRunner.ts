@@ -246,8 +246,8 @@ export class VmRunner extends EventEmitter {
   }
 
   /** the guest is about to power itself off (hibernating), don't report that as a crash */
-  markExpectedExit(name: string): void {
+  markExpectedExit(name: string, expected = true): void {
     const r = this.running.get(name)
-    if (r) r.expectedExit = true
+    if (r) r.expectedExit = expected
   }
 }

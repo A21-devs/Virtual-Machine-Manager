@@ -52,6 +52,11 @@ describe.skipIf(!qemu)('profiles with real QEMU', () => {
     await expect(profiles.take(cfg, 'x', '')).rejects.toThrow(/Power the VM on/)
     await runner.start(cfg)
     await waitFor(runner, cfg.name, 'running')
+    await runner.pause(cfg.name)
+    await waitFor(runner, cfg.name, 'paused')
+    await expect(profiles.take(cfg, 'live', '')).rejects.toThrow(/Resume the VM first/)
+    await runner.resume(cfg.name)
+    await waitFor(runner, cfg.name, 'running')
     // no OS inside, so no guest agent answers
     await expect(profiles.take(cfg, 'live', '')).rejects.toThrow(/needs-guest-setup/)
     expect(runner.isRunning(cfg.name)).toBe(true)
@@ -88,7 +93,11 @@ describe.skipIf(!qemu)('profiles with real QEMU', () => {
     await waitFor(runner, cfg.name, 'off')
     await expect(profiles.restore(cfg, 'first')).rejects.toThrow(/no longer exists/)
 
-    profiles.edit(cfg, 'second', ' renamed ', 'a note')
+    await profiles.edit(cfg, 'second', ' renamed ', 'a note')
+    await expect(profiles.edit(cfg, 'first', 'gone', '')).rejects.toThrow(/no longer exists/)
+    await expect(profiles.edit(cfg, 'second', 'x'.repeat(81), '')).rejects.toThrow(/too long/)
+    await expect(profiles.remove(cfg, '..\\..\\vms')).rejects.toThrow(/Bad profile id/)
+    expect(() => profiles.shot(cfg.name, '../x')).toThrow(/Bad profile id/)
     expect(await profiles.list(cfg)).toMatchObject([{ tag: 'second', label: 'renamed', note: 'a note' }])
 
     profiles.rename(cfg.name, 'profile vm 2')
