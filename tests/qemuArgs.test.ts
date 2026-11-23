@@ -19,6 +19,13 @@ describe('buildQemuArgs', () => {
     expect(drive).toBeDefined()
   })
 
+  it('escapes commas in names and paths', () => {
+    const args = buildQemuArgs(base({ name: 'test, v2', diskPath: 'C:\\VMs,old\\a.qcow2', iso: 'C:\\x,y.iso' }), opts())
+    expect(valueAfter(args, '-name')).toBe('test,, v2,process=test,, v2')
+    expect(args.some((a) => a.startsWith('file=C:\\VMs,,old\\a.qcow2,format=qcow2'))).toBe(true)
+    expect(args.some((a) => a.startsWith('file=C:\\x,,y.iso,'))).toBe(true)
+  })
+
   it('uses whpx with kernel-irqchip off when accelerated', () => {
     expect(valueAfter(buildQemuArgs(base(), opts()), '-machine')).toBe('q35,accel=whpx,kernel-irqchip=off')
     expect(valueAfter(buildQemuArgs(base(), opts({ accel: 'tcg' })), '-machine')).toBe('q35,accel=tcg')

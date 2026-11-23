@@ -23,8 +23,10 @@ export function buildQemuArgs(cfg: VmConfig, opts: LaunchOptions): string[] {
   const a: string[] = []
   const push = (...xs: string[]) => a.push(...xs)
   const whpx = opts.accel === 'whpx'
+  const name = escapeOpt(cfg.name)
+  const disk = escapeOpt(cfg.diskPath)
 
-  push('-name', `${cfg.name},process=${cfg.name}`)
+  push('-name', `${name},process=${name}`)
   push('-machine', whpx ? 'q35,accel=whpx,kernel-irqchip=off' : 'q35,accel=tcg')
   push('-cpu', whpx ? 'max' : 'qemu64')
   // one socket with N cores. Guests schedule this a lot better than N separate sockets.
@@ -39,15 +41,16 @@ export function buildQemuArgs(cfg: VmConfig, opts: LaunchOptions): string[] {
   // writeback cache + threads aio is the fastest safe combo on Windows hosts
   push(
     '-drive',
-    `file=${cfg.diskPath},format=qcow2,if=none,id=disk0,cache=writeback,aio=threads,discard=unmap,detect-zeroes=unmap`
+    `file=${disk},format=qcow2,if=none,id=disk0,cache=writeback,aio=threads,discard=unmap,detect-zeroes=unmap`
   )
   switch (cfg.diskBus) {
     case 'virtio':
       push('-device', 'virtio-blk-pci,drive=disk0,bootindex=1')
       break
+    // On q35 the built-in ide.N buses are the AHCI (SATA) controller, so "sata" and "ide"
+    // end up as the same device. Both are kept so configs from the old app keep working.
     case 'sata':
-      push('-device', 'ide-hd,drive=disk0,bus=ide.0,bootindex=1') // q35 ide.* buses are AHCI (SATA)
-      break
+    case 'ide':
     default:
       push('-device', 'ide-hd,drive=disk0,bus=ide.0,bootindex=1')
   }
@@ -55,7 +58,7 @@ export function buildQemuArgs(cfg: VmConfig, opts: LaunchOptions): string[] {
   // ---- installer ISO ----
   const useIso = Boolean(cfg.iso) && opts.isoExists
   if (useIso) {
-    push('-drive', `file=${cfg.iso},if=none,id=cd0,media=cdrom,readonly=on`)
+    push('-drive', `file=${escapeOpt(cfg.iso)},if=none,id=cd0,media=cdrom,readonly=on`)
     push('-device', `ide-cd,drive=cd0,bus=ide.1${cfg.bootFromIso ? ',bootindex=0' : ''}`)
   }
   push('-boot', 'menu=on')
@@ -101,6 +104,9 @@ export function buildQemuArgs(cfg: VmConfig, opts: LaunchOptions): string[] {
   if (cfg.extraArgs.trim()) a.push(...splitArgs(cfg.extraArgs))
   return a
 }
+
+/** QEMU option values are comma separated, a literal comma is written as two. */
+export const escapeOpt = (value: string) => value.replace(/,/g, ',,')
 
 /** Splits a user-typed argument string, keeping "quoted parts" together. */
 export function splitArgs(input: string): string[] {
