@@ -52,5 +52,7 @@ export class QemuImg {
     return this.call(['create', '-f', 'qcow2', disk, `${sizeGB}G`])
   }
 
+  snapshotCreate = (disk: string, tag: string) => this.call(['snapshot', '-c', tag, disk])
+  snapshotApply = (disk: string, tag: string) => this.call(['snapshot', '-a', tag, disk])
   snapshotDelete = (disk: string, tag: string) => this.call(['snapshot', '-d', tag, disk])
 }

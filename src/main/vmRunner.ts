@@ -23,7 +23,7 @@ interface Running {
   expectedExit: boolean
 }
 
-/** Internal snapshot name used for the one-click save state. */
+/** Internal snapshot name used for the one-click save state. Profiles use other names. */
 export const QUICKSAVE = 'vmm-quicksave'
 
 const NO_QEMU = "QEMU was not found. Install it or put it in the data folder's qemu\\ directory."
@@ -207,6 +207,11 @@ export class VmRunner extends EventEmitter {
     })
   }
 
+  /** PNG of the current screen. QEMU writes the file itself, so the path has to be absolute. */
+  async screendump(name: string, file: string): Promise<void> {
+    await this.need(name).execute('screendump', { filename: file, format: 'png' })
+  }
+
   /**
    * Saves RAM + disk into the qcow2 as QUICKSAVE and quits. Only works without WHPX:
    * QEMU's WHPX backend blocks migration ("missing dirty memory tracking support"),
@@ -223,7 +228,7 @@ export class VmRunner extends EventEmitter {
     if (!(await this.waitForExit(name, 10_000))) r.proc.kill()
   }
 
-  /** drops an internal snapshot from a running VM's disk (used to throw away a save state once it's loaded) */
+  /** drops an internal snapshot from a running VM's disk (a loaded save state, or a profile) */
   async deleteSnapshotLive(name: string, tag: string): Promise<void> {
     await this.need(name).execute('blockdev-snapshot-delete-internal-sync', { device: 'disk0', name: tag })
   }
