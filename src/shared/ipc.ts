@@ -63,6 +63,16 @@ export interface VmmApi {
   saveState(name: string): Promise<SaveStateResult>
   hasSaveState(name: string): Promise<boolean>
   discardSaveState(name: string): Promise<void>
+  /** named save points, newest first */
+  profiles(name: string): Promise<Profile[]>
+  /** saves the running session. Errors starting with needs-guest-setup mean the guest agent is missing */
+  takeProfile(name: string, label: string, note: string): Promise<Profile>
+  /** rolls back to the profile and boots it. force = turn the VM off first if it's running */
+  launchProfile(name: string, tag: string, force: boolean): Promise<void>
+  deleteProfile(name: string, tag: string): Promise<void>
+  editProfile(name: string, tag: string, label: string, note: string): Promise<void>
+  /** the screenshot as a data: URL */
+  profileShot(name: string, tag: string): Promise<string | null>
   /** the command to type into a Linux guest once so Save state (hibernate) works there */
   guestSetupCommand(): Promise<string>
   openDataFolder(): Promise<void>
