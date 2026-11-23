@@ -57,7 +57,12 @@ export class QmpClient extends EventEmitter {
           if (!greeted && 'QMP' in msg) {
             greeted = true
             s.off('error', reject)
-            s.on('error', (e) => this.emit('error', e))
+            // QEMU exiting usually shows up as ECONNRESET on Windows. That's expected,
+            // the 'close' handler cleans up. Only re-emit if someone actually listens,
+            // an 'error' event with no listener would crash the main process.
+            s.on('error', (e) => {
+              if (this.listenerCount('error') > 0) this.emit('error', e)
+            })
             this.socket = s
             resolve()
             continue

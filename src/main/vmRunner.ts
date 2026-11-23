@@ -4,7 +4,8 @@ import { createServer } from 'node:net'
 import { constants, setPriority } from 'node:os'
 import { dirname, join } from 'node:path'
 import { EventEmitter } from 'node:events'
-import { execFileSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import type { VmConfig } from '@shared/config'
 import { buildQemuArgs } from '@shared/qemuArgs'
 import type { VmRuntimeState, VmStatus } from '@shared/ipc'
@@ -14,9 +15,12 @@ import { detectAccel, qemuImgFor, qemuShareFor, type DataPaths } from './paths'
 interface Running {
   proc: ChildProcess
   qmp: QmpClient | null
+  qmpError: string | null
   status: VmStatus
   startedAt: number
 }
+
+const execFileAsync = promisify(execFile)
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -65,7 +69,7 @@ export class VmRunner extends EventEmitter {
     if (!qemu) throw new Error('QEMU was not found. Install it or put it in the data folder\'s qemu\\ directory.')
 
     if (!existsSync(cfg.diskPath)) {
-      execFileSync(qemuImgFor(qemu), ['create', '-f', 'qcow2', cfg.diskPath, `${cfg.diskSizeGB}G`], { windowsHide: true })
+      await execFileAsync(qemuImgFor(qemu), ['create', '-f', 'qcow2', cfg.diskPath, `${cfg.diskSizeGB}G`], { windowsHide: true })
     }
 
     const accel = cfg.accel === 'auto' ? await detectAccel(qemu) : cfg.accel
@@ -85,7 +89,7 @@ export class VmRunner extends EventEmitter {
     proc.stdout?.pipe(log, { end: false })
     proc.stderr?.pipe(log, { end: false })
 
-    const entry: Running = { proc, qmp: null, status: 'starting', startedAt: Date.now() }
+    const entry: Running = { proc, qmp: null, qmpError: null, status: 'starting', startedAt: Date.now() }
     this.running.set(cfg.name, entry)
     this.setStatus(cfg.name, 'starting')
 
@@ -121,16 +125,25 @@ export class VmRunner extends EventEmitter {
         if (ev === 'RESUME') this.setStatus(cfg.name, 'running')
       })
       this.setStatus(cfg.name, 'running')
-    } catch {
-      // QEMU may have died already, the exit handler reports that
-      if (this.running.has(cfg.name)) this.setStatus(cfg.name, 'running')
+    } catch (err) {
+      // QEMU may have died already, the exit handler reports that.
+      // If it's still up we just can't control it, remember why for the power buttons.
+      if (this.running.has(cfg.name)) {
+        entry.qmpError = err instanceof Error ? err.message : String(err)
+        this.setStatus(cfg.name, 'running')
+      }
     }
   }
 
   private need(name: string): QmpClient {
-    const q = this.running.get(name)?.qmp
-    if (!q) throw new Error(`${name} is not running`)
-    return q
+    const r = this.running.get(name)
+    if (!r) throw new Error(`${name} is not running`)
+    if (!r.qmp) {
+      throw new Error(
+        `${name} is running but the app couldn't connect to its control socket (${r.qmpError ?? 'still starting'}). Check the Log tab, or use Force off.`
+      )
+    }
+    return r.qmp
   }
 
   pause = (name: string) => this.need(name).execute('stop')
