@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { VmConfig } from '@shared/config'
 import type { Profile } from '@shared/ipc'
@@ -33,6 +33,9 @@ function cleanLabel(label: string): string {
 
 /** Profiles are internal qcow2 snapshots. Labels, notes and screenshots live next to them in profiles/<vm>/. */
 export class Profiles {
+  /** VMs with a take/launch/remove in flight */
+  private busy = new Set<string>()
+
   constructor(
     private readonly paths: DataPaths,
     private readonly runner: VmRunner
@@ -40,6 +43,20 @@ export class Profiles {
 
   private dir(vm: string): string {
     return join(this.paths.profiles, vm)
+  }
+
+  /**
+   * One profile operation per VM at a time. A take waits minutes for the guest to hibernate,
+   * and a launch or a second take during that would kill it or ask it to hibernate twice.
+   */
+  private async exclusive<T>(vm: string, fn: () => Promise<T>): Promise<T> {
+    if (this.busy.has(vm)) throw new Error(`${vm} is still busy with another profile. Wait for it to finish.`)
+    this.busy.add(vm)
+    try {
+      return await fn()
+    } finally {
+      this.busy.delete(vm)
+    }
   }
 
   private shotFile(vm: string, tag: string): string {
@@ -85,7 +102,11 @@ export class Profiles {
    * hibernates: everything open is written to its own disk and it powers off. Snapshotting
    * that disk captures the whole session, and booting the snapshot later resumes it.
    */
-  async take(cfg: VmConfig, label: string, note: string): Promise<Profile> {
+  take(cfg: VmConfig, label: string, note: string): Promise<Profile> {
+    return this.exclusive(cfg.name, () => this.takeNow(cfg, label, note))
+  }
+
+  private async takeNow(cfg: VmConfig, label: string, note: string): Promise<Profile> {
     const clean = cleanLabel(label)
     const status = this.runner.state(cfg.name).status
     if (status === 'off') throw new Error('Power the VM on to save a profile of it')
@@ -121,7 +142,11 @@ export class Profiles {
   }
 
   /** Rolls back to the profile and boots it. A session profile resumes everything that was open. */
-  async launch(cfg: VmConfig, tag: string, force: boolean): Promise<void> {
+  launch(cfg: VmConfig, tag: string, force: boolean): Promise<void> {
+    return this.exclusive(cfg.name, () => this.launchNow(cfg, tag, force))
+  }
+
+  private async launchNow(cfg: VmConfig, tag: string, force: boolean): Promise<void> {
     checkTag(tag)
     if (this.runner.isRunning(cfg.name)) {
       if (!force) throw new Error('vm-running')
@@ -146,7 +171,11 @@ export class Profiles {
     return 'applied'
   }
 
-  async remove(cfg: VmConfig, tag: string): Promise<void> {
+  remove(cfg: VmConfig, tag: string): Promise<void> {
+    return this.exclusive(cfg.name, () => this.removeNow(cfg, tag))
+  }
+
+  private async removeNow(cfg: VmConfig, tag: string): Promise<void> {
     checkTag(tag)
     if (this.runner.isRunning(cfg.name)) await this.runner.deleteSnapshotLive(cfg.name, tag)
     else await this.runner.img().snapshotDelete(cfg.diskPath, tag)
@@ -174,7 +203,18 @@ export class Profiles {
 
   /** keeps labels and screenshots attached when a VM is renamed */
   rename(from: string, to: string): void {
-    if (from === to || !existsSync(this.dir(from)) || existsSync(this.dir(to))) return
-    renameSync(this.dir(from), this.dir(to))
+    if (from === to || !existsSync(this.dir(from))) return
+    if (!existsSync(this.dir(to))) {
+      renameSync(this.dir(from), this.dir(to))
+      return
+    }
+    // a deleted VM can leave its folder under the new name. Tags are unique per snapshot,
+    // so the two merge without clashing, and the renamed VM's entries win.
+    const merged = { ...this.readMeta(to), ...this.readMeta(from) }
+    for (const f of readdirSync(this.dir(from))) {
+      if (f.endsWith('.png')) renameSync(join(this.dir(from), f), join(this.dir(to), f))
+    }
+    this.writeMeta(to, merged)
+    rmSync(this.dir(from), { recursive: true, force: true })
   }
 }
