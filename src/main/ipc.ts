@@ -3,10 +3,11 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { cpus, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { defaultConfig, type VmConfig } from '@shared/config'
-import type { HostInfo, PowerAction } from '@shared/ipc'
+import type { HostInfo, PowerAction, SaveStateResult } from '@shared/ipc'
+import { agentHibernate } from './agent'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { deleteConfig, listConfigs, saveConfig } from './store'
-import { VmRunner } from './vmRunner'
+import { QUICKSAVE, VmRunner } from './vmRunner'
 
 export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | null): VmRunner {
   const runner = new VmRunner(paths, () => findQemu(paths))
@@ -58,7 +59,39 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     deleteConfig(paths, name) // the disk file is kept on purpose
   })
 
-  ipcMain.handle('start', (_e, name: string) => runner.start(byName(name)))
+  ipcMain.handle('start', async (_e, name: string, opts?: { resume?: boolean }) => {
+    const cfg = byName(name)
+    if (opts?.resume === true && (await runner.hasSaveState(cfg))) {
+      await runner.start(cfg, { loadState: QUICKSAVE })
+      // a save state is used once. Loading it again later would throw away
+      // everything done on the disk since, so drop it as soon as it's loaded.
+      await runner.deleteSnapshotLive(name, QUICKSAVE).catch(() => undefined)
+      return
+    }
+    await runner.start(cfg)
+  })
+
+  ipcMain.handle('saveState', async (_e, name: string): Promise<SaveStateResult> => {
+    const accel = runner.accelOf(name)
+    if (!accel) throw new Error(`${name} is not running`)
+    if (accel === 'tcg') {
+      await runner.saveAndQuit(name)
+      return { method: 'savevm' }
+    }
+    // QEMU can't write WHPX memory to disk, so the guest saves itself: it hibernates
+    // to its own swap, powers off, and the next normal boot picks up where it was.
+    await agentHibernate(runner.agentPortOf(name))
+    runner.markExpectedExit(name)
+    return { method: 'hibernate' }
+  })
+
+  ipcMain.handle('hasSaveState', (_e, name: string) => runner.hasSaveState(byName(name)))
+
+  ipcMain.handle('discardSaveState', async (_e, name: string) => {
+    const cfg = byName(name)
+    if (runner.isRunning(name)) throw new Error('Turn the VM off first')
+    if (await runner.hasSaveState(cfg)) await runner.img().snapshotDelete(cfg.diskPath, QUICKSAVE)
+  })
 
   ipcMain.handle('power', async (_e, name: string, action: PowerAction) => {
     if (action === 'kill') return runner.kill(name)

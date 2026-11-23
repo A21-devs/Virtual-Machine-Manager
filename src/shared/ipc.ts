@@ -21,6 +21,9 @@ export interface HostInfo {
 
 export type PowerAction = 'pause' | 'resume' | 'reset' | 'shutdown' | 'kill'
 
+/** savevm: RAM written into the qcow2 (TCG only). hibernate: the guest saves itself and powers off (WHPX). */
+export type SaveStateResult = { method: 'savevm' } | { method: 'hibernate' }
+
 /** Everything the renderer can call. Implemented in main/ipc.ts, exposed in preload. */
 export interface VmmApi {
   host(): Promise<HostInfo>
@@ -28,9 +31,13 @@ export interface VmmApi {
   newConfig(): Promise<VmConfig>
   save(cfg: VmConfig, previousName?: string): Promise<VmConfig>
   remove(name: string): Promise<void>
-  start(name: string): Promise<void>
+  /** resume: load the save state if the disk has one */
+  start(name: string, opts?: { resume?: boolean }): Promise<void>
   power(name: string, action: PowerAction): Promise<void>
   states(): Promise<VmRuntimeState[]>
+  saveState(name: string): Promise<SaveStateResult>
+  hasSaveState(name: string): Promise<boolean>
+  discardSaveState(name: string): Promise<void>
   openDataFolder(): Promise<void>
   openLog(name: string): Promise<void>
   readLog(name: string): Promise<string>
