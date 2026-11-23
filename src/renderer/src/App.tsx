@@ -157,6 +157,8 @@ export default function App() {
             onCancelDraft={() => setDraft(null)}
             onDelete={onDelete}
             onDirtyChange={setUnsaved}
+            toast={toasts.push}
+            onNeedsSetup={(reason) => setSetupFor({ vm: current, reason })}
           />
         ) : (
           <main className="empty">
