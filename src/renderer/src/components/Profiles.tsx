@@ -149,6 +149,7 @@ export default function Profiles({ vm, status, toast, onNeedsSetup }: Props) {
                   <div className="profile-actions">
                     <button
                       className="btn small primary"
+                      aria-label={`Launch ${p.label}`}
                       disabled={busy !== null || status === 'starting'}
                       onClick={() => launch(p)}
                       title="Go back to this profile and start it"
