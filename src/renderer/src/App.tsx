@@ -16,6 +16,8 @@ export default function App() {
   const [draft, setDraft] = useState<VmConfig | null>(null) // new VM that isn't saved yet
   const [busy, setBusy] = useState(false)
   const [unsaved, setUnsaved] = useState(false)
+  // VMs that are hibernating: still running for a few seconds, but saving again would fail
+  const [hibernating, setHibernating] = useState<Set<string>>(new Set())
   const toasts = useToasts()
 
   const refresh = useCallback(async () => {
@@ -28,7 +30,10 @@ export default function App() {
     window.vmm.host().then(setHost)
     refresh()
     window.vmm.states().then((all) => setStates(Object.fromEntries(all.map((s) => [s.name, s.status]))))
-    const offState = window.vmm.onState((s: VmRuntimeState) => setStates((cur) => ({ ...cur, [s.name]: s.status })))
+    const offState = window.vmm.onState((s: VmRuntimeState) => {
+      setStates((cur) => ({ ...cur, [s.name]: s.status }))
+      if (s.status === 'off') setHibernating((cur) => (cur.has(s.name) ? new Set([...cur].filter((n) => n !== s.name)) : cur))
+    })
     const offCrash = window.vmm.onCrash((c) => toasts.push('error', `${c.name} failed to start`, c.message))
     return () => {
       offState()
@@ -80,8 +85,9 @@ export default function App() {
     guard(async () => {
       // a save state is only worth keeping to come back to, so Power on resumes it
       const resume = await window.vmm.hasSaveState(name).catch(() => false)
-      await window.vmm.start(name, { resume })
-      if (resume) toasts.push('ok', `Resumed ${name}`, 'The save state was used up. Save again to keep a new one.')
+      const r = await window.vmm.start(name, { resume })
+      if (r.warning) toasts.push('error', `${name} resumed, but`, r.warning)
+      else if (r.resumed) toasts.push('ok', `Resumed ${name}`, 'The save state was used up. Save again to keep a new one.')
     }, `Could not start ${name}`)
   }
 
@@ -90,16 +96,19 @@ export default function App() {
     const name = current.name
     guard(async () => {
       const r = await window.vmm.saveState(name)
-      toasts.push(
-        'ok',
-        `Saving ${name}`,
-        r.method === 'hibernate' ? 'The guest is saving what is open to its disk and will turn off by itself. Power on brings it back.' : 'Saved and turned off. Power on resumes from here.'
-      )
+      if (r.method === 'hibernate') {
+        setHibernating((cur) => new Set(cur).add(name))
+        toasts.push('ok', `Saving ${name}`, 'The guest is saving what is open to its disk and will turn off by itself. Power on brings it back.')
+      } else {
+        toasts.push('ok', `Saved ${name}`, 'Saved and turned off. Power on resumes from here.')
+      }
     }, `Could not save ${name}`)
   }
 
+  // same choice the main process makes: the VM's own setting, or what the host has for auto
+  const vmAccel = current?.accel === 'auto' ? host?.accel : current?.accel
   const saveHint =
-    host?.accel === 'tcg'
+    vmAccel === 'tcg'
       ? 'Saves memory and disk, then turns the VM off. Power on resumes it.'
       : 'Asks the guest to hibernate: it saves what is open to its own disk and turns off. Needs qemu-guest-agent in the guest.'
   const onPower = (a: PowerAction) => current && guard(() => window.vmm.power(current.name, a), 'Power action failed')
@@ -118,6 +127,7 @@ export default function App() {
         onStart={onStart}
         onPower={onPower}
         onSaveState={onSaveState}
+        saving={Boolean(current && hibernating.has(current.name))}
         saveHint={saveHint}
       />
       <div className="layout">

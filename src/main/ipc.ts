@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { cpus, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { defaultConfig, type VmConfig } from '@shared/config'
-import type { HostInfo, PowerAction, SaveStateResult } from '@shared/ipc'
+import type { HostInfo, PowerAction, SaveStateResult, StartResult } from '@shared/ipc'
 import { agentHibernate } from './agent'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { deleteConfig, listConfigs, saveConfig } from './store'
@@ -59,16 +59,25 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     deleteConfig(paths, name) // the disk file is kept on purpose
   })
 
-  ipcMain.handle('start', async (_e, name: string, opts?: { resume?: boolean }) => {
+  ipcMain.handle('start', async (_e, name: string, opts?: { resume?: boolean }): Promise<StartResult> => {
     const cfg = byName(name)
     if (opts?.resume === true && (await runner.hasSaveState(cfg))) {
       await runner.start(cfg, { loadState: QUICKSAVE })
       // a save state is used once. Loading it again later would throw away
       // everything done on the disk since, so drop it as soon as it's loaded.
-      await runner.deleteSnapshotLive(name, QUICKSAVE).catch(() => undefined)
-      return
+      try {
+        await runner.deleteSnapshotLive(name, QUICKSAVE)
+      } catch (e) {
+        const why = e instanceof Error ? e.message : String(e)
+        return {
+          resumed: true,
+          warning: `The save state could not be removed after loading it (${why}). Discard it on the Summary tab once ${name} is off, otherwise the next Power on goes back to it and loses what you did since.`
+        }
+      }
+      return { resumed: true }
     }
     await runner.start(cfg)
+    return { resumed: false }
   })
 
   ipcMain.handle('saveState', async (_e, name: string): Promise<SaveStateResult> => {

@@ -12,11 +12,13 @@ interface Props {
   onSaveState: () => void
   /** what Save state will do for this VM, shown as the tooltip */
   saveHint: string
+  /** the guest is hibernating, Save state was already sent */
+  saving: boolean
 }
 
 const ICON = 16
 
-export default function Toolbar({ vm, status, busy, onNew, onStart, onPower, onSaveState, saveHint }: Props) {
+export default function Toolbar({ vm, status, busy, onNew, onStart, onPower, onSaveState, saveHint, saving }: Props) {
   const off = status === 'off'
   const live = status === 'running' || status === 'paused'
   return (
@@ -38,7 +40,7 @@ export default function Toolbar({ vm, status, busy, onNew, onStart, onPower, onS
           <Pause size={ICON} /> Suspend
         </button>
       )}
-      <button className="tb-btn" disabled={status !== 'running' || busy} onClick={onSaveState} title={saveHint}>
+      <button className="tb-btn" disabled={status !== 'running' || busy || saving} onClick={onSaveState} title={saving ? 'Saving, the VM turns off when it is done' : saveHint}>
         <Save size={ICON} /> Save state
       </button>
       <button className="tb-btn" disabled={!live || busy} onClick={() => onPower('reset')}>
