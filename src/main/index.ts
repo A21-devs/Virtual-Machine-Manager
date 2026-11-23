@@ -1,5 +1,9 @@
-import { app, BrowserWindow, shell } from 'electron'
+﻿import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
+import { registerIpc } from './ipc'
+import { dataPaths } from './paths'
+
+let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -18,6 +22,8 @@ function createWindow(): void {
     }
   })
 
+  mainWindow = win
+  win.on('closed', () => (mainWindow = null))
   win.once('ready-to-show', () => win.show())
 
   // open external links in the real browser, never inside the app
@@ -34,6 +40,8 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  const runner = registerIpc(dataPaths(), () => mainWindow)
+  app.on('before-quit', () => runner.killAll())
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
