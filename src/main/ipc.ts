@@ -3,16 +3,18 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { cpus, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { defaultConfig, type VmConfig } from '@shared/config'
-import type { HostInfo, PowerAction, SaveStateResult, StartResult } from '@shared/ipc'
+import type { HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
 import { agentHibernate } from './agent'
 import { GuestSetupServer } from './guestSetup'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
+import { Profiles } from './profiles'
 import { deleteConfig, listConfigs, saveConfig } from './store'
 import { QUICKSAVE, VmRunner } from './vmRunner'
 
 export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | null): VmRunner {
   const runner = new VmRunner(paths, () => findQemu(paths))
   const guestSetup = new GuestSetupServer()
+  const profiles = new Profiles(paths, runner)
 
   const send = (channel: string, payload: unknown) => getWindow()?.webContents.send(channel, payload)
   runner.on('state', (s) => send('vm:state', s))
@@ -54,7 +56,12 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     return defaultConfig(`New VM ${i}`, paths.disks)
   })
 
-  ipcMain.handle('save', (_e, cfg: VmConfig, previousName?: string) => saveConfig(paths, cfg, previousName))
+  ipcMain.handle('save', (_e, cfg: VmConfig, previousName?: string) => {
+    const saved = saveConfig(paths, cfg, previousName)
+    // labels and screenshots are kept by VM name, so they have to move along
+    if (previousName && previousName !== saved.name) profiles.rename(previousName, saved.name)
+    return saved
+  })
 
   ipcMain.handle('remove', (_e, name: string) => {
     if (runner.state(name).status !== 'off') throw new Error('Turn the VM off before deleting it')
@@ -110,6 +117,16 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     if (runner.isRunning(name)) throw new Error('Turn the VM off first')
     if (await runner.hasSaveState(cfg)) await runner.img().snapshotDelete(cfg.diskPath, QUICKSAVE)
   })
+
+  ipcMain.handle('profiles', (_e, name: string) => profiles.list(byName(name)))
+  ipcMain.handle('takeProfile', (_e, name: string, label: string, note: string): Promise<Profile> => profiles.take(byName(name), String(label), String(note ?? '')))
+  ipcMain.handle('launchProfile', (_e, name: string, tag: string, force: boolean) => profiles.launch(byName(name), tag, force === true))
+  ipcMain.handle('deleteProfile', (_e, name: string, tag: string) => profiles.remove(byName(name), tag))
+  ipcMain.handle('editProfile', (_e, name: string, tag: string, label: string, note: string) =>
+    profiles.edit(byName(name), tag, String(label), String(note ?? ''))
+  )
+  // byName makes sure the folder it reads from belongs to a real VM
+  ipcMain.handle('profileShot', (_e, name: string, tag: string) => profiles.shot(byName(name).name, tag))
 
   ipcMain.handle('power', async (_e, name: string, action: PowerAction) => {
     if (action === 'kill') return runner.kill(name)
