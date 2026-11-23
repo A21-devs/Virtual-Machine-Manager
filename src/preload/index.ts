@@ -22,6 +22,7 @@ const api: VmmApi = {
   saveState: (name) => ipcRenderer.invoke('saveState', name),
   hasSaveState: (name) => ipcRenderer.invoke('hasSaveState', name),
   discardSaveState: (name) => ipcRenderer.invoke('discardSaveState', name),
+  guestSetupCommand: () => ipcRenderer.invoke('guestSetupCommand'),
   openDataFolder: () => ipcRenderer.invoke('openDataFolder'),
   openLog: (name) => ipcRenderer.invoke('openLog', name),
   readLog: (name) => ipcRenderer.invoke('readLog', name),

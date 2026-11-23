@@ -5,12 +5,14 @@ import { join } from 'node:path'
 import { defaultConfig, type VmConfig } from '@shared/config'
 import type { HostInfo, PowerAction, SaveStateResult, StartResult } from '@shared/ipc'
 import { agentHibernate } from './agent'
+import { GuestSetupServer } from './guestSetup'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { deleteConfig, listConfigs, saveConfig } from './store'
 import { QUICKSAVE, VmRunner } from './vmRunner'
 
 export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | null): VmRunner {
   const runner = new VmRunner(paths, () => findQemu(paths))
+  const guestSetup = new GuestSetupServer()
 
   const send = (channel: string, payload: unknown) => getWindow()?.webContents.send(channel, payload)
   runner.on('state', (s) => send('vm:state', s))
@@ -89,10 +91,17 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     }
     // QEMU can't write WHPX memory to disk, so the guest saves itself: it hibernates
     // to its own swap, powers off, and the next normal boot picks up where it was.
-    await agentHibernate(runner.agentPortOf(name))
+    try {
+      await agentHibernate(runner.agentPortOf(name))
+    } catch (e) {
+      // most likely qemu-guest-agent isn't installed yet, the UI offers the one-time setup
+      return { method: 'needs-setup', reason: e instanceof Error ? e.message : String(e) }
+    }
     runner.markExpectedExit(name)
     return { method: 'hibernate' }
   })
+
+  ipcMain.handle('guestSetupCommand', () => guestSetup.command())
 
   ipcMain.handle('hasSaveState', (_e, name: string) => runner.hasSaveState(byName(name)))
 

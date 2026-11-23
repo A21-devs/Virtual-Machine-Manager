@@ -6,6 +6,7 @@ import Toolbar from './components/Toolbar'
 import VmDetail from './components/VmDetail'
 import StatusBar from './components/StatusBar'
 import Toasts, { useToasts } from './components/Toasts'
+import GuestSetup from './components/GuestSetup'
 import { errText } from './util'
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
   const [unsaved, setUnsaved] = useState(false)
   // VMs that are hibernating: still running for a few seconds, but saving again would fail
   const [hibernating, setHibernating] = useState<Set<string>>(new Set())
+  const [setupFor, setSetupFor] = useState<{ vm: VmConfig; reason: string } | null>(null)
   const toasts = useToasts()
 
   const refresh = useCallback(async () => {
@@ -93,10 +95,13 @@ export default function App() {
 
   const onSaveState = () => {
     if (!current) return
-    const name = current.name
+    const vm = current
+    const name = vm.name
     guard(async () => {
       const r = await window.vmm.saveState(name)
-      if (r.method === 'hibernate') {
+      if (r.method === 'needs-setup') {
+        setSetupFor({ vm, reason: r.reason })
+      } else if (r.method === 'hibernate') {
         setHibernating((cur) => new Set(cur).add(name))
         toasts.push('ok', `Saving ${name}`, 'The guest is saving what is open to its disk and will turn off by itself. Power on brings it back.')
       } else {
@@ -165,6 +170,7 @@ export default function App() {
       </div>
       <StatusBar host={host} running={Object.values(states).filter((s) => s !== 'off').length} />
       <Toasts items={toasts.items} dismiss={toasts.dismiss} />
+      {setupFor && <GuestSetup vm={setupFor.vm} reason={setupFor.reason} onClose={() => setSetupFor(null)} />}
     </div>
   )
 }
