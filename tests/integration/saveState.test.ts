@@ -67,14 +67,18 @@ describe.skipIf(!qemu)('save states with real QEMU', () => {
     expect(crashes).not.toContain(cfg.name)
   })
 
-  it('refuses a RAM save under WHPX with a clear reason', async () => {
+  it('refuses a RAM save under WHPX with a clear reason', async (ctx) => {
     const cfg = vm('whpx vm', { accel: 'auto' })
     await runner.start(cfg)
     await waitFor(runner, cfg.name, 'running')
-    if (runner.accelOf(cfg.name) === 'whpx') await expect(runner.saveAndQuit(cfg.name)).rejects.toThrow(/WHPX/)
-    expect(runner.isRunning(cfg.name)).toBe(true)
-    runner.kill(cfg.name)
-    await waitFor(runner, cfg.name, 'off')
+    try {
+      if (runner.accelOf(cfg.name) !== 'whpx') ctx.skip()
+      await expect(runner.saveAndQuit(cfg.name)).rejects.toThrow(/WHPX/)
+      expect(runner.isRunning(cfg.name)).toBe(true)
+    } finally {
+      runner.kill(cfg.name)
+      await waitFor(runner, cfg.name, 'off')
+    }
   })
 
   it('the guest agent gives a clear error when nothing answers', async () => {

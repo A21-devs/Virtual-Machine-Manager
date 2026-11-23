@@ -98,7 +98,9 @@ export class VmRunner extends EventEmitter {
 
     const accel = cfg.accel === 'auto' ? await detectAccel(qemu) : cfg.accel
     const qmpPort = await freePort()
-    const agentPort = await freePort()
+    // freePort releases the port before returning, so the OS can hand it out twice
+    let agentPort = await freePort()
+    while (agentPort === qmpPort) agentPort = await freePort()
     const args = buildQemuArgs(cfg, {
       accel,
       qemuShareDir: qemuShareFor(qemu),
