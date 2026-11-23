@@ -15,6 +15,7 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null)
   const [draft, setDraft] = useState<VmConfig | null>(null) // new VM that isn't saved yet
   const [busy, setBusy] = useState(false)
+  const [unsaved, setUnsaved] = useState(false)
   const toasts = useToasts()
 
   const refresh = useCallback(async () => {
@@ -69,7 +70,14 @@ export default function App() {
     }, 'Could not remove VM')
   }
 
-  const onStart = () => current && guard(() => window.vmm.start(current.name), `Could not start ${current.name}`)
+  const onStart = () => {
+    if (!current) return
+    if (unsaved) {
+      toasts.push('info', 'Unsaved hardware changes', 'Save or revert them on the Hardware tab first, otherwise the VM would boot with the old settings.')
+      return
+    }
+    guard(() => window.vmm.start(current.name), `Could not start ${current.name}`)
+  }
   const onPower = (a: PowerAction) => current && guard(() => window.vmm.power(current.name, a), 'Power action failed')
 
   return (
@@ -107,6 +115,7 @@ export default function App() {
             onSave={onSave}
             onCancelDraft={() => setDraft(null)}
             onDelete={onDelete}
+            onDirtyChange={setUnsaved}
           />
         ) : (
           <main className="empty">

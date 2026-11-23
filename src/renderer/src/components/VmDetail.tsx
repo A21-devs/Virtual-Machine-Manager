@@ -14,17 +14,26 @@ interface Props {
   onSave: (cfg: VmConfig, previousName?: string) => void
   onCancelDraft: () => void
   onDelete: (name: string) => void
+  onDirtyChange: (dirty: boolean) => void
 }
 
 type Tab = 'summary' | 'hardware' | 'log'
 
-export default function VmDetail({ vm, isDraft, status, host, onSave, onCancelDraft, onDelete }: Props) {
+export default function VmDetail({ vm, isDraft, status, host, onSave, onCancelDraft, onDelete, onDirtyChange }: Props) {
   const [tab, setTab] = useState<Tab>(isDraft ? 'hardware' : 'summary')
   const [form, setForm] = useState<VmConfig>(vm)
   useEffect(() => setForm(vm), [vm])
 
   const dirty = isDraft || JSON.stringify(form) !== JSON.stringify(vm)
   const nameError = validateVmName(form.name)
+  const diskError =
+    !Number.isInteger(form.diskSizeGB) || form.diskSizeGB < 5 || form.diskSizeGB > 4096 ? 'Pick a whole number from 5 to 4096 GB' : null
+
+  // the toolbar lives in App, it needs to know when Power on would ignore unsaved edits
+  useEffect(() => {
+    onDirtyChange(!isDraft && dirty)
+    return () => onDirtyChange(false) // switching VMs throws the edits away
+  }, [dirty, isDraft, onDirtyChange])
 
   return (
     <main className="detail">
@@ -63,6 +72,7 @@ export default function VmDetail({ vm, isDraft, status, host, onSave, onCancelDr
             isDraft={isDraft}
             dirty={dirty}
             nameError={nameError}
+            diskError={diskError}
             onSave={() => onSave(form, vm.name)}
             onRevert={() => (isDraft ? onCancelDraft() : setForm(vm))}
             onDelete={() => onDelete(vm.name)}

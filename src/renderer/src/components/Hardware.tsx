@@ -11,12 +11,13 @@ interface Props {
   isDraft: boolean
   dirty: boolean
   nameError: string | null
+  diskError: string | null
   onSave: () => void
   onRevert: () => void
   onDelete: () => void
 }
 
-export default function Hardware({ form, setForm, host, locked, isDraft, dirty, nameError, onSave, onRevert, onDelete }: Props) {
+export default function Hardware({ form, setForm, host, locked, isDraft, dirty, nameError, diskError, onSave, onRevert, onDelete }: Props) {
   const set = <K extends keyof VmConfig>(k: K, v: VmConfig[K]) => setForm((f) => ({ ...f, [k]: v }))
   const maxRam = host ? Math.max(1024, Math.floor((host.totalRamMB - 2048) / 512) * 512) : 32768
   const maxCpu = host?.cpuCount ?? 16
@@ -54,9 +55,16 @@ export default function Hardware({ form, setForm, host, locked, isDraft, dirty, 
         </Group>
 
         <Group title="Storage">
-          <Row label="Disk size" hint={isDraft ? 'grows as the guest writes, up to this size' : 'only used when the disk file is created'}>
+          <Row label="Disk size" error={diskError} hint={isDraft ? 'grows as the guest writes, up to this size' : 'only used when the disk file is created'}>
             <div className="with-unit">
-              <input type="number" min={5} max={4096} value={form.diskSizeGB} onChange={(e) => set('diskSizeGB', Number(e.target.value))} />
+              <input
+                type="number"
+                min={5}
+                max={4096}
+                aria-invalid={Boolean(diskError)}
+                value={Number.isNaN(form.diskSizeGB) ? '' : form.diskSizeGB}
+                onChange={(e) => set('diskSizeGB', e.target.value === '' ? Number.NaN : Number(e.target.value))}
+              />
               <span>GB</span>
             </div>
           </Row>
@@ -148,7 +156,7 @@ export default function Hardware({ form, setForm, host, locked, isDraft, dirty, 
         <button className="btn" disabled={!dirty || locked} onClick={onRevert}>
           {isDraft ? 'Cancel' : 'Revert'}
         </button>
-        <button className="btn primary" disabled={!dirty || Boolean(nameError) || locked} onClick={onSave}>
+        <button className="btn primary" disabled={!dirty || Boolean(nameError) || Boolean(diskError) || locked} onClick={onSave}>
           {isDraft ? 'Create' : 'Save'}
         </button>
       </div>

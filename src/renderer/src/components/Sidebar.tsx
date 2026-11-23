@@ -31,7 +31,7 @@ export default function Sidebar({ vms, states, selected, draftName, onSelect }: 
       <ul className="tree" role="listbox" aria-label="Virtual machines">
         {draftName && (
           <li>
-            <div className="row active draft">
+            <div className="row active draft" role="option" aria-selected>
               <OsMark os="other" />
               <span className="row-name">{draftName}</span>
               <span className="row-state">new</span>
