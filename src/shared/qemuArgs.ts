@@ -11,6 +11,8 @@ export interface LaunchOptions {
   loadState?: string
   /** whether an ISO file actually exists on disk */
   isoExists: boolean
+  /** localhost TCP port for the guest agent channel (qemu-guest-agent in the guest) */
+  agentPort?: number
 }
 
 /**
@@ -98,6 +100,10 @@ export function buildQemuArgs(cfg: VmConfig, opts: LaunchOptions): string[] {
 
   // ---- control socket ----
   if (opts.qmpPort) push('-qmp', `tcp:127.0.0.1:${opts.qmpPort},server=on,wait=off`)
+  if (opts.agentPort) {
+    push('-chardev', `socket,id=qga0,host=127.0.0.1,port=${opts.agentPort},server=on,wait=off`)
+    push('-device', 'virtio-serial-pci', '-device', 'virtserialport,chardev=qga0,name=org.qemu.guest_agent.0')
+  }
 
   if (opts.loadState) push('-loadvm', opts.loadState)
 
