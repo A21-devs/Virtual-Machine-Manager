@@ -17,6 +17,7 @@ export function installMockApi(): void {
     stateListeners.forEach((cb) => cb(s))
   }
   const later = (ms: number, fn: () => void) => setTimeout(fn, ms)
+  const saved = new Set<string>(['Parrot Home'])
 
   const api: VmmApi = {
     host: async () => ({
@@ -37,9 +38,11 @@ export function installMockApi(): void {
     remove: async (name) => {
       vms = vms.filter((v) => v.name !== name)
     },
-    start: async (name) => {
+    start: async (name, opts) => {
+      const resumed = Boolean(opts?.resume && saved.delete(name))
       emit({ name, status: 'starting', pid: 1234, startedAt: Date.now() })
       later(900, () => emit({ name, status: 'running', pid: 1234, startedAt: Date.now() }))
+      return { resumed }
     },
     power: async (name, action) => {
       const s = states[name]
@@ -49,6 +52,13 @@ export function installMockApi(): void {
       if (action === 'kill' || action === 'shutdown') later(400, () => emit({ name, status: 'off', pid: null, startedAt: null }))
     },
     states: async () => Object.values(states),
+    saveState: async (name) => {
+      // the mock pretends to be WHPX: the guest hibernates and powers off by itself
+      later(1500, () => emit({ name, status: 'off', pid: null, startedAt: null }))
+      return { method: 'hibernate' }
+    },
+    hasSaveState: async (name) => saved.has(name),
+    discardSaveState: async (name) => void saved.delete(name),
     openDataFolder: async () => undefined,
     openLog: async () => undefined,
     readLog: async (name) => `> qemu-system-x86_64.exe -name ${name} -machine q35,accel=whpx,kernel-irqchip=off ...`,

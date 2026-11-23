@@ -4,7 +4,7 @@ import type { HostInfo, VmStatus } from '@shared/ipc'
 import OsMark from './OsMark'
 import Hardware from './Hardware'
 import LogView from './LogView'
-import { fileName, gb, statusLabel } from '../util'
+import { errText, fileName, gb, statusLabel } from '../util'
 
 interface Props {
   vm: VmConfig
@@ -85,6 +85,32 @@ export default function VmDetail({ vm, isDraft, status, host, onSave, onCancelDr
 }
 
 function Summary({ vm, status, host }: { vm: VmConfig; status: VmStatus; host: HostInfo | null }) {
+  const [hasSave, setHasSave] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
+  const [discardError, setDiscardError] = useState<string | null>(null)
+  useEffect(() => {
+    let live = true
+    // checked again on every status change: saving turns the VM off, Power on uses the save up
+    window.vmm.hasSaveState(vm.name).then((h) => live && setHasSave(h), () => live && setHasSave(false))
+    return () => {
+      live = false
+    }
+  }, [vm.name, status])
+
+  const discard = async () => {
+    if (!confirm(`Throw away the save state of ${vm.name}? It will start fresh next time.`)) return
+    setDiscarding(true)
+    setDiscardError(null)
+    try {
+      await window.vmm.discardSaveState(vm.name)
+      setHasSave(false)
+    } catch (e) {
+      setDiscardError(errText(e))
+    } finally {
+      setDiscarding(false)
+    }
+  }
+
   const isoMissing = Boolean(vm.iso) && host !== null && !host.isos.includes(vm.iso)
   const rows: [string, React.ReactNode][] = [
     ['Guest OS', vm.os === 'linux' ? 'Linux' : vm.os === 'windows' ? 'Windows' : 'Other'],
@@ -107,6 +133,18 @@ function Summary({ vm, status, host }: { vm: VmConfig; status: VmStatus; host: H
     ['Firmware', vm.firmware === 'uefi' ? 'UEFI' : 'BIOS'],
     ['Disk file', <span className="mono" title={vm.diskPath}>{vm.diskPath}</span>]
   ]
+  if (hasSave) {
+    rows.splice(1, 0, [
+      'Save state',
+      <span className="save-row">
+        Power on resumes it
+        <button className="btn small danger-ghost" disabled={status !== 'off' || discarding} onClick={discard} title={status !== 'off' ? 'Turn the VM off first' : undefined}>
+          Discard
+        </button>
+        {discardError && <span className="warn-text">{discardError}</span>}
+      </span>
+    ])
+  }
   return (
     <div className="summary">
       <div className={`screen ${status}`}>
