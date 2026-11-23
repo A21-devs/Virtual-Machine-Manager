@@ -148,6 +148,7 @@ button:disabled { cursor: default; }
 /* summary */
 .summary { display: grid; grid-template-columns: minmax(240px, 380px) minmax(260px, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 860px) { .summary { grid-template-columns: 1fr; } }
+.save-row { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .screen {
   aspect-ratio: 16 / 10;
   display: grid; place-items: center;

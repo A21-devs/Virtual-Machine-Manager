@@ -1,4 +1,4 @@
-import { Pause, Play, Plus, Power, RotateCcw, Square } from 'lucide-react'
+import { Pause, Play, Plus, Power, RotateCcw, Save, Square } from 'lucide-react'
 import type { VmConfig } from '@shared/config'
 import type { PowerAction, VmStatus } from '@shared/ipc'
 
@@ -9,11 +9,14 @@ interface Props {
   onNew: () => void
   onStart: () => void
   onPower: (a: PowerAction) => void
+  onSaveState: () => void
+  /** what Save state will do for this VM, shown as the tooltip */
+  saveHint: string
 }
 
 const ICON = 16
 
-export default function Toolbar({ vm, status, busy, onNew, onStart, onPower }: Props) {
+export default function Toolbar({ vm, status, busy, onNew, onStart, onPower, onSaveState, saveHint }: Props) {
   const off = status === 'off'
   const live = status === 'running' || status === 'paused'
   return (
@@ -35,6 +38,9 @@ export default function Toolbar({ vm, status, busy, onNew, onStart, onPower }: P
           <Pause size={ICON} /> Suspend
         </button>
       )}
+      <button className="tb-btn" disabled={status !== 'running' || busy} onClick={onSaveState} title={saveHint}>
+        <Save size={ICON} /> Save state
+      </button>
       <button className="tb-btn" disabled={!live || busy} onClick={() => onPower('reset')}>
         <RotateCcw size={ICON} /> Restart
       </button>

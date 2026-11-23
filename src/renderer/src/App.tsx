@@ -76,8 +76,32 @@ export default function App() {
       toasts.push('info', 'Unsaved hardware changes', 'Save or revert them on the Hardware tab first, otherwise the VM would boot with the old settings.')
       return
     }
-    guard(() => window.vmm.start(current.name), `Could not start ${current.name}`)
+    const name = current.name
+    guard(async () => {
+      // a save state is only worth keeping to come back to, so Power on resumes it
+      const resume = await window.vmm.hasSaveState(name).catch(() => false)
+      await window.vmm.start(name, { resume })
+      if (resume) toasts.push('ok', `Resumed ${name}`, 'The save state was used up. Save again to keep a new one.')
+    }, `Could not start ${name}`)
   }
+
+  const onSaveState = () => {
+    if (!current) return
+    const name = current.name
+    guard(async () => {
+      const r = await window.vmm.saveState(name)
+      toasts.push(
+        'ok',
+        `Saving ${name}`,
+        r.method === 'hibernate' ? 'The guest is saving what is open to its disk and will turn off by itself. Power on brings it back.' : 'Saved and turned off. Power on resumes from here.'
+      )
+    }, `Could not save ${name}`)
+  }
+
+  const saveHint =
+    host?.accel === 'tcg'
+      ? 'Saves memory and disk, then turns the VM off. Power on resumes it.'
+      : 'Asks the guest to hibernate: it saves what is open to its own disk and turns off. Needs qemu-guest-agent in the guest.'
   const onPower = (a: PowerAction) => current && guard(() => window.vmm.power(current.name, a), 'Power action failed')
 
   return (
@@ -93,6 +117,8 @@ export default function App() {
         onNew={onNew}
         onStart={onStart}
         onPower={onPower}
+        onSaveState={onSaveState}
+        saveHint={saveHint}
       />
       <div className="layout">
         <Sidebar
