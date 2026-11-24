@@ -6,3 +6,6 @@ contact_links:
   - name: Latest release
     url: https://github.com/A21-devs/Virtual-Machine-Manager/releases/latest
     about: Check you are on the newest version before reporting a bug.
+  - name: Questions and ideas
+    url: https://github.com/A21-devs/Virtual-Machine-Manager/discussions
+    about: Ask how to do something or suggest a feature before it becomes an issue.
