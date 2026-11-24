@@ -17,6 +17,7 @@ const api: VmmApi = {
   save: (cfg, previousName) => ipcRenderer.invoke('save', cfg, previousName),
   remove: (name) => ipcRenderer.invoke('remove', name),
   start: (name, opts) => ipcRenderer.invoke('start', name, opts),
+  autostart: () => ipcRenderer.invoke('autostart'),
   power: (name, action) => ipcRenderer.invoke('power', name, action),
   states: () => ipcRenderer.invoke('states'),
   saveState: (name) => ipcRenderer.invoke('saveState', name),

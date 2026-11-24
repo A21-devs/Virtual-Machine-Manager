@@ -58,6 +58,7 @@ export function installMockApi(): void {
     remove: async (name) => {
       vms = vms.filter((v) => v.name !== name)
     },
+    autostart: async () => [],
     start: async (name, opts) => {
       const resumed = Boolean(opts?.resume && saved.delete(name))
       emit({ name, status: 'starting', pid: 1234, startedAt: Date.now() })

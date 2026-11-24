@@ -3,8 +3,9 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { cpus, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { defaultConfig, type VmConfig } from '@shared/config'
-import type { HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
+import type { AutostartIssue, HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
 import { agentHibernate } from './agent'
+import { runAutostart } from './autostart'
 import { GuestSetupServer } from './guestSetup'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { Profiles } from './profiles'
@@ -112,6 +113,15 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
   }
 
   ipcMain.handle('start', (_e, name: string, opts?: { resume?: boolean }) => startVm(name, opts?.resume === true))
+
+  // The renderer asks for this once its listeners are up, so a VM that fails right away
+  // still gets a toast. A reload of the window must not start everything a second time.
+  let autostarted = false
+  ipcMain.handle('autostart', (): Promise<AutostartIssue[]> => {
+    if (autostarted) return Promise.resolve([])
+    autostarted = true
+    return runAutostart(listConfigs(paths), startVm)
+  })
 
   ipcMain.handle('saveState', async (_e, name: string): Promise<SaveStateResult> => {
     const accel = runner.accelOf(name)

@@ -44,24 +44,12 @@ let backend: Backend | null = null
 app.whenReady().then(() => {
   backend = registerIpc(dataPaths(), () => mainWindow)
   app.on('before-quit', () => backend?.runner.killAll())
+  // auto-start runs when the renderer asks for it (the 'autostart' IPC), once it can show errors
   createWindow()
-  mainWindow?.webContents.once('did-finish-load', () => void autostart())
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
-
-/** Starts the VMs marked "Start this VM automatically", one after another. */
-async function autostart(): Promise<void> {
-  if (!backend) return
-  for (const cfg of backend.configs().filter((c) => c.autostart)) {
-    try {
-      await backend.startVm(cfg.name, cfg.resumeLast)
-    } catch (e) {
-      mainWindow?.webContents.send('vm:crash', { name: cfg.name, message: `Auto-start failed: ${e instanceof Error ? e.message : String(e)}` })
-    }
-  }
-}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
