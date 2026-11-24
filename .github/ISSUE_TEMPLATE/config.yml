@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Wiki
+    url: https://github.com/A21-devs/Virtual-Machine-Manager/wiki
+    about: Installing, your first VM, profiles, guest setup and troubleshooting.
+  - name: Latest release
+    url: https://github.com/A21-devs/Virtual-Machine-Manager/releases/latest
+    about: Check you are on the newest version before reporting a bug.
