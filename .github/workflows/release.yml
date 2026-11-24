@@ -16,6 +16,14 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Tag matches package.json
+        shell: bash
+        run: |
+          want="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then
+            echo "Tag is $GITHUB_REF_NAME but package.json says $want. Bump the version first."
+            exit 1
+          fi
       - run: npm ci
       - run: npx install-electron --no
       - run: npm run typecheck
