@@ -45,7 +45,7 @@ I wanted something that feels like VMware Workstation but is free and fully mine
 
 - Windows 10 or 11, 64-bit
 - **Windows Hypervisor Platform** turned on: Start → "Turn Windows features on or off" → tick *Windows Hypervisor Platform* → restart. Without it VMs still run, just much slower.
-- [QEMU for Windows](https://qemu.weilnetz.de/w64/) installed (the app finds it in Program Files, on your PATH, or in `VMs\qemu`)
+- [QEMU for Windows](https://qemu.weilnetz.de/w64/) installed in `C:\Program Files\qemu` (the installer's default), or its files copied into `%USERPROFILE%\VMs\qemu`
 
 ## Install
 
@@ -68,11 +68,12 @@ Everything is in `%USERPROFILE%\VMs`:
 
 ```
 VMs/
-  vms/     one .json config per VM
-  disks/   qcow2 disk images
-  ISOs/    installer images
-  qemu/    QEMU binaries (optional, otherwise PATH / Program Files is used)
-  logs/    per-VM launch logs
+  vms/      one .json config per VM
+  disks/    qcow2 disk images
+  ISOs/     installer images
+  qemu/     QEMU binaries (optional, otherwise C:\Program Files\qemu is used)
+  profiles/ profile details and screenshots
+  logs/     per-VM launch logs
 ```
 
 Uninstalling the app never touches this folder.
