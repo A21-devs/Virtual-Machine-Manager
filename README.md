@@ -28,7 +28,7 @@ I wanted something that feels like VMware Workstation but is free and fully mine
 **Save your place**
 - **Save state:** close a VM and pick up where you left off next time you power it on
 - **Profiles:** save named points in time for a VM ("tools set up", "clean install") with a screenshot and a note, then **Launch** any of them later to go straight back to that moment
-- Profiles taken while the VM is running keep everything that was open. Profiles taken while it's off keep the disk and boot fresh.
+- Profiles taken while a Linux VM is running keep everything that was open. Profiles taken while it's off keep the disk and boot fresh, for any guest.
 
 **Set them up**
 - Hardware tab: name, guest OS, CPU cores and RAM (sliders that know your PC's limits), disk size and controller, CD/DVD image and whether it boots first, network mode and adapter, graphics, BIOS or UEFI, acceleration and extra QEMU arguments
@@ -56,8 +56,8 @@ I wanted something that feels like VMware Workstation but is free and fully mine
 ## Your first VM
 
 1. Put an installer ISO in `%USERPROFILE%\VMs\ISOs` (Kali, Ubuntu, Windows, anything QEMU boots).
-2. Click **New**, give it a name and pick the guest OS.
-3. In **Hardware**, choose the ISO under CD/DVD, set cores and memory, save.
+2. Click **New**. The Hardware form opens for the new VM.
+3. Fill it in: name, guest OS, the ISO under CD/DVD, cores and memory. Save.
 4. Click **Power on**. The VM opens in its own window.
 
 More walkthroughs are in the [wiki](https://github.com/A21-devs/Virtual-Machine-Manager/wiki).
@@ -83,7 +83,9 @@ Uninstalling the app never touches this folder.
 
 **Does it work alongside WSL, Docker Desktop or Hyper-V?** Yes. WHPX is the same hypervisor they use, which is why VMware and VirtualBox often fight with them and this doesn't.
 
-**Why does saving a profile close the VM for a moment?** With WHPX, QEMU can't snapshot a running guest's memory, so the guest hibernates itself, the disk is snapshotted, and the VM starts again. Launching the profile resumes from that hibernation. Linux guests need a one-time setup command for this, and the app shows it to you the first time.
+**Why does saving a profile close the VM for a moment?** With WHPX, QEMU can't snapshot a running guest's memory, so the guest hibernates itself, the disk is snapshotted, and the VM starts again. Launching the profile resumes from that hibernation.
+
+**Which guests can keep open apps in a profile?** Linux guests based on Debian or Ubuntu (Kali, Ubuntu, Mint, Parrot) after a one-time setup command that the app shows you the first time. Windows guests aren't supported for this yet. Profiles of a powered-off VM work with any guest.
 
 **Can I use my existing VMs?** Any qcow2 disk works: put it in `VMs\disks` and point a new VM at it. VMs from the old PowerShell version show up on their own.
 
