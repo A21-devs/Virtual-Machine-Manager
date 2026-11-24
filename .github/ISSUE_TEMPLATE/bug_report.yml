@@ -1,0 +1,34 @@
+name: Bug report
+description: Something does not work the way it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: From the installer file name, e.g. 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: qemu
+    attributes:
+      label: QEMU version and acceleration
+      description: Both are in the status bar at the bottom of the app, e.g. "QEMU 11.1.0, Hyper-V acceleration (WHPX)"
+  - type: input
+    id: guest
+    attributes:
+      label: Guest OS
+      description: The OS inside the VM, e.g. Kali 2026.2, Windows 11
+  - type: textarea
+    id: log
+    attributes:
+      label: Log tab
+      description: Paste what the VM's Log tab shows. Remove anything private.
+      render: text
