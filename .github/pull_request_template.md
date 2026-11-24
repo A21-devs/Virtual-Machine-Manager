@@ -1,6 +1,6 @@
 <!-- Thanks for the PR. Keep it to one change and link the issue. -->
 
-Closes #
+<!-- Closes #123, if there is an issue for this -->
 
 ## What
 
