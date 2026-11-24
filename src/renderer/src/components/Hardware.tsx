@@ -126,6 +126,19 @@ export default function Hardware({ form, setForm, host, locked, isDraft, dirty, 
           </Row>
         </Group>
 
+        <Group title="Startup">
+          <Row label="When the app opens">
+            <label className="check">
+              <input type="checkbox" checked={form.autostart} onChange={(e) => set('autostart', e.target.checked)} />
+              Start this VM automatically
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={form.resumeLast} disabled={!form.autostart} onChange={(e) => set('resumeLast', e.target.checked)} />
+              Resume its saved state if it has one
+            </label>
+          </Row>
+        </Group>
+
         <Group title="Advanced">
           <Row label="Firmware">
             <select value={form.firmware} onChange={(e) => set('firmware', e.target.value as VmConfig['firmware'])}>

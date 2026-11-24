@@ -13,7 +13,7 @@ export function installMockApi(): void {
   const disks = 'C:\\Users\\you\\VMs\\disks'
   let vms: VmConfig[] = [
     { ...defaultConfig('Kali', disks), cpus: 8, ramMB: 8192, diskSizeGB: 100, iso: 'C:\\Users\\you\\VMs\\ISOs\\kali-linux-2026.2-installer-amd64.iso', diskBus: 'ide', nic: 'e1000' },
-    { ...defaultConfig('Parrot Home', disks), cpus: 6, ramMB: 6144 },
+    { ...defaultConfig('Parrot Home', disks), cpus: 6, ramMB: 6144, autostart: true, resumeLast: true },
     { ...defaultConfig('Windows 11', disks), os: 'windows', cpus: 8, ramMB: 16384, firmware: 'uefi', diskSizeGB: 128 }
   ]
   const states: Record<string, VmRuntimeState> = {}

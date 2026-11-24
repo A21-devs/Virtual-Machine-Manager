@@ -143,6 +143,7 @@ function Summary({ vm, status, host }: { vm: VmConfig; status: VmStatus; host: H
     ['Network', vm.network === 'nat' ? `NAT · ${vm.nic}` : 'Disconnected'],
     ['Display', `${vm.video.toUpperCase()} · ${vm.display === 'auto' ? 'SDL' : vm.display.toUpperCase()} window`],
     ['Firmware', vm.firmware === 'uefi' ? 'UEFI' : 'BIOS'],
+    ['Startup', vm.autostart ? `Starts with the app${vm.resumeLast ? ', resumes saved state' : ''}` : 'Manual'],
     ['Disk file', <span className="mono" title={vm.diskPath}>{vm.diskPath}</span>]
   ]
   if (hasSave) {
