@@ -68,12 +68,12 @@ Everything is in `%USERPROFILE%\VMs`:
 
 ```
 VMs/
-  vms/     one .json config per VM
-  disks/   qcow2 disk images
-  ISOs/    installer images
-  qemu/    QEMU binaries (optional, otherwise C:\Program Files\qemu is used)
+  vms/      one .json config per VM
+  disks/    qcow2 disk images
+  ISOs/     installer images
+  qemu/     QEMU binaries (optional, otherwise C:\Program Files\qemu is used)
   profiles/ profile details and screenshots
-  logs/    per-VM launch logs
+  logs/     per-VM launch logs
 ```
 
 Uninstalling the app never touches this folder.
