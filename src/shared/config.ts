@@ -29,6 +29,10 @@ export interface VmConfig {
   extraArgs: string
   // new in v0.1 (not in legacy configs)
   diskBus: DiskBus
+  /** start this VM when the app opens */
+  autostart: boolean
+  /** on autostart, restore the quick save state if there is one */
+  resumeLast: boolean
 }
 
 const pick = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -58,7 +62,9 @@ export function defaultConfig(name: string, diskDir: string): VmConfig {
     bootFromIso: true,
     usbTablet: true,
     extraArgs: '',
-    diskBus: 'virtio'
+    diskBus: 'virtio',
+    autostart: false,
+    resumeLast: false
   }
 }
 
@@ -88,7 +94,9 @@ export function normalizeConfig(raw: unknown, diskDir: string): VmConfig {
     bootFromIso: typeof r.bootFromIso === 'boolean' ? r.bootFromIso : false,
     usbTablet: typeof r.usbTablet === 'boolean' ? r.usbTablet : true,
     extraArgs: typeof r.extraArgs === 'string' ? r.extraArgs : '',
-    diskBus: pick(r.diskBus, ['virtio', 'ide', 'sata'], 'ide')
+    diskBus: pick(r.diskBus, ['virtio', 'ide', 'sata'], 'ide'),
+    autostart: r.autostart === true,
+    resumeLast: r.resumeLast === true
   }
 }
 

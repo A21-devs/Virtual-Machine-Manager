@@ -33,6 +33,13 @@ export interface StartResult {
   warning?: string
 }
 
+/** A VM auto-start has to tell the user about. error: it didn't start. warning: it started, but read this. */
+export interface AutostartIssue {
+  name: string
+  error?: string
+  warning?: string
+}
+
 /**
  * A named save point ("profile"), stored as an internal qcow2 snapshot.
  * session = taken while running: the guest hibernated first, so launching it brings back
@@ -58,6 +65,11 @@ export interface VmmApi {
   remove(name: string): Promise<void>
   /** resume: load the save state if the disk has one */
   start(name: string, opts?: { resume?: boolean }): Promise<StartResult>
+  /**
+   * Starts the VMs marked for auto-start. Called by the UI once it's listening for
+   * events. Only the first call per app run does anything, later ones return [].
+   */
+  autostart(): Promise<AutostartIssue[]>
   power(name: string, action: PowerAction): Promise<void>
   states(): Promise<VmRuntimeState[]>
   saveState(name: string): Promise<SaveStateResult>

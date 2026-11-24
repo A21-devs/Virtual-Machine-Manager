@@ -38,6 +38,14 @@ describe('normalizeConfig', () => {
     expect(cfg.video).toBe('qxl')
   })
 
+  it('leaves auto-start off for configs that predate it', () => {
+    const cfg = normalizeConfig({ name: 'Kali', cpus: 4 }, DISKS)
+    expect(cfg).toMatchObject({ autostart: false, resumeLast: false })
+    // only a real true turns it on, not a truthy string from a hand-edited file
+    expect(normalizeConfig({ name: 'Kali', autostart: 'yes', resumeLast: 1 }, DISKS)).toMatchObject({ autostart: false, resumeLast: false })
+    expect(normalizeConfig({ name: 'Kali', autostart: true, resumeLast: true }, DISKS)).toMatchObject({ autostart: true, resumeLast: true })
+  })
+
   it('survives null', () => {
     expect(normalizeConfig(null, DISKS).name).toBe('Untitled VM')
   })

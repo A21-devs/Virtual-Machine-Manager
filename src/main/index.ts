@@ -1,6 +1,6 @@
 ﻿import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
-import { registerIpc } from './ipc'
+import { registerIpc, type Backend } from './ipc'
 import { dataPaths } from './paths'
 
 let mainWindow: BrowserWindow | null = null
@@ -39,9 +39,12 @@ function createWindow(): void {
   }
 }
 
+let backend: Backend | null = null
+
 app.whenReady().then(() => {
-  const runner = registerIpc(dataPaths(), () => mainWindow)
-  app.on('before-quit', () => runner.killAll())
+  backend = registerIpc(dataPaths(), () => mainWindow)
+  app.on('before-quit', () => backend?.runner.killAll())
+  // auto-start runs when the renderer asks for it (the 'autostart' IPC), once it can show errors
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

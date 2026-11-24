@@ -3,15 +3,24 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { cpus, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { defaultConfig, type VmConfig } from '@shared/config'
-import type { HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
+import type { AutostartIssue, HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
 import { agentHibernate } from './agent'
+import { runAutostart } from './autostart'
 import { GuestSetupServer } from './guestSetup'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { Profiles } from './profiles'
 import { deleteConfig, listConfigs, saveConfig } from './store'
 import { QUICKSAVE, VmRunner } from './vmRunner'
 
-export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | null): VmRunner {
+/** What the rest of the main process needs from the IPC layer. */
+export interface Backend {
+  runner: VmRunner
+  configs: () => VmConfig[]
+  /** Same as the renderer's Power on. With resume, a quick save state is loaded if there is one. */
+  startVm: (name: string, resume: boolean) => Promise<StartResult>
+}
+
+export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | null): Backend {
   const runner = new VmRunner(paths, () => findQemu(paths))
   const guestSetup = new GuestSetupServer()
   const profiles = new Profiles(paths, runner)
@@ -81,10 +90,10 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     deleteConfig(paths, name) // the disk file is kept on purpose
   })
 
-  ipcMain.handle('start', async (_e, name: string, opts?: { resume?: boolean }): Promise<StartResult> => {
+  const startVm = async (name: string, resume: boolean): Promise<StartResult> => {
     notMidProfile(name)
     const cfg = byName(name)
-    if (opts?.resume === true && (await runner.hasSaveState(cfg))) {
+    if (resume && (await runner.hasSaveState(cfg))) {
       await runner.start(cfg, { loadState: QUICKSAVE })
       // a save state is used once. Loading it again later would throw away
       // everything done on the disk since, so drop it as soon as it's loaded.
@@ -101,6 +110,17 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     }
     await runner.start(cfg)
     return { resumed: false }
+  }
+
+  ipcMain.handle('start', (_e, name: string, opts?: { resume?: boolean }) => startVm(name, opts?.resume === true))
+
+  // The renderer asks for this once its listeners are up, so a VM that fails right away
+  // still gets a toast. A reload of the window must not start everything a second time.
+  let autostarted = false
+  ipcMain.handle('autostart', (): Promise<AutostartIssue[]> => {
+    if (autostarted) return Promise.resolve([])
+    autostarted = true
+    return runAutostart(listConfigs(paths), startVm)
   })
 
   ipcMain.handle('saveState', async (_e, name: string): Promise<SaveStateResult> => {
@@ -159,5 +179,5 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     }
   })
 
-  return runner
+  return { runner, configs: () => listConfigs(paths), startVm }
 }

@@ -37,6 +37,16 @@ export default function App() {
       if (s.status === 'off') setHibernating((cur) => (cur.has(s.name) ? new Set([...cur].filter((n) => n !== s.name)) : cur))
     })
     const offCrash = window.vmm.onCrash((c) => toasts.push('error', `${c.name} failed to start`, c.message))
+    // only now, with the listeners above in place, so a VM that fails at once still shows up
+    window.vmm
+      .autostart()
+      .then((issues) => {
+        for (const i of issues) {
+          if (i.error) toasts.push('error', `${i.name} didn't start with the app`, i.error)
+          else if (i.warning) toasts.push('error', `${i.name} resumed, but`, i.warning)
+        }
+      })
+      .catch((e) => toasts.push('error', 'Auto-start failed', errText(e)))
     return () => {
       offState()
       offCrash()
