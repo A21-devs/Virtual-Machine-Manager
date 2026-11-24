@@ -28,7 +28,7 @@ export function installMockApi(): void {
   const profiles: Record<string, Profile[]> = {
     Kali: [
       { tag: 'p1', label: 'Tools set up', note: 'burp, ffuf, wordlists', created: Date.now() - 2 * day, kind: 'session', hasShot: true },
-      { tag: 'p0', label: 'Clean install', note: '', created: Date.now() - 9 * day, kind: 'disk', hasShot: false }
+      { tag: 'p0', label: 'Clean install', note: 'updated, nothing else', created: Date.now() - 9 * day, kind: 'session', hasShot: true }
     ]
   }
   const running = (name: string) => (states[name]?.status ?? 'off') !== 'off'
