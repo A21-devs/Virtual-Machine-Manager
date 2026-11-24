@@ -13,7 +13,7 @@ body:
     id: version
     attributes:
       label: App version
-      description: From the installer file name, e.g. 0.1.0
+      description: Settings > Apps > Installed apps shows it under Virtual Machine Manager, e.g. 0.1.0
     validations:
       required: true
   - type: input
