@@ -13,7 +13,8 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:qemu": "cross-env QEMU_IT=1 vitest run",
-        "dev:web": "vite --config vite.web.config.mts"
+        "dev:web": "vite --config vite.web.config.mts",
+        "dist": "electron-vite build && electron-builder --win nsis --publish never"
     },
     "devDependencies": {
         "@types/node": "^24.19.2",
@@ -22,6 +23,7 @@
         "@vitejs/plugin-react": "^6.3.0",
         "cross-env": "^10.1.0",
         "electron": "^45.4.1",
+        "electron-builder": "^26.18.0",
         "electron-vite": "^6.0.0",
         "typescript": "^7.0.2",
         "vite": "^8.3.8",
@@ -31,5 +33,38 @@
         "lucide-react": "^1.78.0",
         "react": "^19.3.1",
         "react-dom": "^19.3.1"
+    },
+    "build": {
+        "appId": "io.github.a21devs.vmmanager",
+        "productName": "Virtual Machine Manager",
+        "directories": {
+            "output": "release",
+            "buildResources": "resources"
+        },
+        "files": [
+            "out/**/*",
+            "resources/**/*",
+            "package.json"
+        ],
+        "icon": "resources/icon.png",
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "artifactName": "Virtual-Machine-Manager-Setup-${version}.${ext}",
+            "icon": "resources/icon.ico"
+        },
+        "nsis": {
+            "oneClick": false,
+            "perMachine": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "shortcutName": "Virtual Machine Manager"
+        }
     }
 }
