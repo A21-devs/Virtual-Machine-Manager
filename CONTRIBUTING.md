@@ -28,4 +28,4 @@ npm run dev:web             # the UI alone in a browser with a fake backend, no 
 
 ## Where to start
 
-Issues labelled [good first issue](https://github.com/A21-devs/Virtual-Machine-Manager/labels/good%20first%20issue) are small and don't need much context. Comment on one if you're picking it up so nobody doubles up.
+Issues labelled [first issue](https://github.com/A21-devs/Virtual-Machine-Manager/labels/first%20issue) are small and don't need much context. Comment on one if you're picking it up so nobody doubles up.
