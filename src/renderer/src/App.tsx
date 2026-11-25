@@ -77,11 +77,17 @@ export default function App() {
     }
   }
 
+  // read after awaits (an ISO copy can take a while), so it can't come from a stale closure
+  const draftOpen = useRef(false)
+  draftOpen.current = draft !== null
+  /** opens a new draft. Returns false if the user kept the one that is already open */
   const startDraft = (cfg: VmConfig) => {
+    if (draftOpen.current && !confirm('Discard the new VM you are setting up and start another one?')) return false
     setDraftKey((k) => k + 1)
     setDraft(cfg)
+    return true
   }
-  const onNew = async () => startDraft(await window.vmm.newConfig())
+  const onNew = async () => void startDraft(await window.vmm.newConfig())
 
   // ---- drop an .iso on the window ----
   const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes('Files')
@@ -105,7 +111,7 @@ export default function App() {
       setHost(await window.vmm.host())
       // a new VM with the ISO in the drive, ready to fill in
       const cfg = await window.vmm.newConfig()
-      startDraft({ ...cfg, iso: final, bootFromIso: true })
+      if (!startDraft({ ...cfg, iso: final, bootFromIso: true })) toasts.push('ok', `Added ${fileName(final)}`, 'Pick it under CD/DVD on the Hardware tab.')
     }, 'Could not add the ISO')
   }
 
