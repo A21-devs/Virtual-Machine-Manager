@@ -1,6 +1,44 @@
-import { existsSync, readdirSync, watch } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, statSync, watch } from 'node:fs'
+import { copyFile, rename, rm } from 'node:fs/promises'
+import { basename, extname, join } from 'node:path'
 import type { VmConfig } from '@shared/config'
+
+/**
+ * Adds an ISO the user dropped on the window. reference: use it where it is.
+ * copy: copy it into the ISOs folder. Returns the path the VM should use.
+ */
+export async function importIso(src: string, isosDir: string, mode: 'copy' | 'reference'): Promise<string> {
+  if (typeof src !== 'string' || !/\.iso$/i.test(src)) throw new Error('Only .iso files can be added')
+  let size: number
+  try {
+    const st = statSync(src)
+    if (!st.isFile()) throw new Error()
+    size = st.size
+  } catch {
+    throw new Error(`${src} does not exist`)
+  }
+  if (mode === 'reference') return src
+  if (mode !== 'copy') throw new Error(`Unknown import mode: ${String(mode)}`)
+
+  // same name and size counts as the same ISO dropped twice and is reused,
+  // a different file with the same name gets a number
+  const stem = basename(src, extname(src))
+  let target = join(isosDir, basename(src))
+  for (let i = 2; existsSync(target); i++) {
+    if (target.toLowerCase() === src.toLowerCase() || statSync(target).size === size) return target
+    target = join(isosDir, `${stem} (${i}).iso`)
+  }
+  // copy under a name the ISO list ignores, so a half-copied file never shows up as bootable
+  const part = `${target}.part`
+  try {
+    await copyFile(src, part)
+    await rename(part, target)
+  } catch (e) {
+    await rm(part, { force: true })
+    throw e
+  }
+  return target
+}
 
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase() // Windows paths
 

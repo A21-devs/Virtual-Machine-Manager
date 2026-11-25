@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { defaultConfig } from '@shared/config'
-import { listIsos, watchFolder } from '../src/main/isos'
+import { importIso, listIsos, watchFolder } from '../src/main/isos'
 
 let dir: string
 beforeEach(() => {
@@ -82,5 +82,56 @@ describe('watchFolder', () => {
     await new Promise((r) => setTimeout(r, 300))
     expect(calls).toBe(1)
     expect(() => stop()).not.toThrow()
+  })
+})
+
+describe('importIso', () => {
+  let src: string
+  let isos: string
+  beforeEach(() => {
+    src = join(dir, 'Downloads')
+    isos = join(dir, 'ISOs')
+    mkdirSync(src)
+    mkdirSync(isos)
+  })
+
+  it('rejects anything that is not an existing .iso', async () => {
+    writeFileSync(join(src, 'setup.exe'), 'x')
+    await expect(importIso(join(src, 'setup.exe'), isos, 'copy')).rejects.toThrow(/\.iso/)
+    await expect(importIso(join(src, 'gone.iso'), isos, 'reference')).rejects.toThrow(/does not exist/)
+    mkdirSync(join(src, 'folder.iso'))
+    await expect(importIso(join(src, 'folder.iso'), isos, 'reference')).rejects.toThrow(/does not exist/)
+  })
+
+  it('references the file where it is', async () => {
+    const file = join(src, 'debian.iso')
+    writeFileSync(file, 'abc')
+    expect(await importIso(file, isos, 'reference')).toBe(file)
+    expect(readdirSync(isos)).toEqual([])
+  })
+
+  it('copies into the ISOs folder without leaving a .part file', async () => {
+    const file = join(src, 'debian.iso')
+    writeFileSync(file, 'abc')
+    const out = await importIso(file, isos, 'copy')
+    expect(out).toBe(join(isos, 'debian.iso'))
+    expect(readFileSync(out, 'utf8')).toBe('abc')
+    expect(readdirSync(isos)).toEqual(['debian.iso'])
+  })
+
+  it('reuses the same ISO dropped twice, numbers a different one with the same name', async () => {
+    writeFileSync(join(isos, 'debian.iso'), 'abc')
+    writeFileSync(join(src, 'debian.iso'), 'abc')
+    expect(await importIso(join(src, 'debian.iso'), isos, 'copy')).toBe(join(isos, 'debian.iso'))
+    writeFileSync(join(src, 'debian.iso'), 'a newer build')
+    expect(await importIso(join(src, 'debian.iso'), isos, 'copy')).toBe(join(isos, 'debian (2).iso'))
+    expect(readFileSync(join(isos, 'debian (2).iso'), 'utf8')).toBe('a newer build')
+  })
+
+  it('returns a file that is already in the ISOs folder as is', async () => {
+    const file = join(isos, 'kali.iso')
+    writeFileSync(file, 'abc')
+    expect(await importIso(file, isos, 'copy')).toBe(file)
+    expect(readdirSync(isos)).toEqual(['kali.iso'])
   })
 })
