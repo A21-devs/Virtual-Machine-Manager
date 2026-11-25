@@ -1,4 +1,4 @@
-﻿import { contextBridge, ipcRenderer } from 'electron'
+﻿import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { VmmApi } from '@shared/ipc'
 
 const listen = <T>(channel: string, cb: (payload: T) => void) => {
@@ -30,6 +30,8 @@ const api: VmmApi = {
   deleteProfile: (name, tag) => ipcRenderer.invoke('deleteProfile', name, tag),
   editProfile: (name, tag, label, note) => ipcRenderer.invoke('editProfile', name, tag, label, note),
   profileShot: (name, tag) => ipcRenderer.invoke('profileShot', name, tag),
+  pathForFile: (file) => webUtils.getPathForFile(file),
+  importIso: (path, mode) => ipcRenderer.invoke('importIso', path, mode),
   openDataFolder: () => ipcRenderer.invoke('openDataFolder'),
   openLog: (name) => ipcRenderer.invoke('openLog', name),
   readLog: (name) => ipcRenderer.invoke('readLog', name),

@@ -7,7 +7,7 @@ import type { AutostartIssue, HostInfo, PowerAction, Profile, SaveStateResult, S
 import { agentHibernate } from './agent'
 import { runAutostart } from './autostart'
 import { GuestSetupServer } from './guestSetup'
-import { listIsos, watchFolder } from './isos'
+import { importIso, listIsos, watchFolder } from './isos'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { Profiles } from './profiles'
 import { deleteConfig, listConfigs, saveConfig } from './store'
@@ -54,6 +54,9 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
       totalRamMB: Math.floor(totalmem() / 1024 / 1024)
     }
   })
+
+  // an .iso dropped on the window: used where it is, or copied into the ISOs folder
+  ipcMain.handle('importIso', (_e, path: string, mode: 'copy' | 'reference') => importIso(path, paths.isos, mode))
 
   ipcMain.handle('list', () => listConfigs(paths))
 

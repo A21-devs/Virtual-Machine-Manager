@@ -34,6 +34,7 @@ I wanted something that feels like VMware Workstation but is free and fully mine
 **Set them up**
 - Hardware tab: name, guest OS, CPU cores and RAM (sliders that know your PC's limits), disk size and controller, CD/DVD image and whether it boots first, network mode and adapter, graphics, BIOS or UEFI, acceleration and extra QEMU arguments
 - Hardware can't be changed while a VM is running, and unsaved edits block Power on so nothing runs with half-applied settings
+- **ISOs:** new files in the ISOs folder show up right away, and you can drop an `.iso` anywhere on the window to start a new VM from it (copied into the ISOs folder, or used where it is)
 - Log tab with each VM's QEMU output, for when a guest won't boot
 - Reads VM configs made by the old PowerShell version, so nothing has to be recreated
 
@@ -58,8 +59,8 @@ I wanted something that feels like VMware Workstation but is free and fully mine
 
 ## Your first VM
 
-1. Put an installer ISO in `%USERPROFILE%\VMs\ISOs` (Kali, Ubuntu, Windows, anything QEMU boots).
-2. Click **New**. The Hardware form opens for the new VM.
+1. Put an installer ISO in `%USERPROFILE%\VMs\ISOs` (Kali, Ubuntu, Windows, anything QEMU boots), then click **New**. The Hardware form opens for the new VM.
+2. Or drag the `.iso` onto the window from wherever it is. You can copy it into the ISOs folder or leave it where it is, and the new VM's form opens with it already in the CD/DVD drive.
 3. Fill it in: name, guest OS, the ISO under CD/DVD, cores and memory. Save.
 4. Click **Power on**. The VM opens in its own window.
 

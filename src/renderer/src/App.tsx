@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { VmConfig } from '@shared/config'
 import type { HostInfo, PowerAction, VmRuntimeState, VmStatus } from '@shared/ipc'
 import Sidebar from './components/Sidebar'
@@ -7,7 +7,8 @@ import VmDetail from './components/VmDetail'
 import StatusBar from './components/StatusBar'
 import Toasts, { useToasts } from './components/Toasts'
 import GuestSetup from './components/GuestSetup'
-import { errText } from './util'
+import Modal from './components/Modal'
+import { errText, fileName } from './util'
 
 export default function App() {
   const [host, setHost] = useState<HostInfo | null>(null)
@@ -20,6 +21,11 @@ export default function App() {
   // VMs that are hibernating: still running for a few seconds, but saving again would fail
   const [hibernating, setHibernating] = useState<Set<string>>(new Set())
   const [setupFor, setSetupFor] = useState<{ vm: VmConfig; reason: string } | null>(null)
+  // bumped for every new draft so its form starts fresh instead of keeping the last one's edits
+  const [draftKey, setDraftKey] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const dragDepth = useRef(0) // dragenter/dragleave fire for every child, count them
+  const [droppedIso, setDroppedIso] = useState<string | null>(null)
   const toasts = useToasts()
 
   const refresh = useCallback(async () => {
@@ -71,7 +77,43 @@ export default function App() {
     }
   }
 
-  const onNew = async () => setDraft(await window.vmm.newConfig())
+  // read after awaits (an ISO copy can take a while), so it can't come from a stale closure
+  const draftOpen = useRef(false)
+  draftOpen.current = draft !== null
+  /** opens a new draft. Returns false if the user kept the one that is already open */
+  const startDraft = (cfg: VmConfig) => {
+    if (draftOpen.current && !confirm('Discard the new VM you are setting up and start another one?')) return false
+    setDraftKey((k) => k + 1)
+    setDraft(cfg)
+    return true
+  }
+  const onNew = async () => void startDraft(await window.vmm.newConfig())
+
+  // ---- drop an .iso on the window ----
+  const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes('Files')
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault() // otherwise Electron navigates to the file
+    dragDepth.current = 0
+    setDragging(false)
+    const files = [...e.dataTransfer.files]
+    const iso = files.find((f) => f.name.toLowerCase().endsWith('.iso'))
+    if (!iso) {
+      if (files.length) toasts.push('info', 'Only .iso files can be dropped here')
+      return
+    }
+    setDroppedIso(window.vmm.pathForFile(iso))
+  }
+  const importIso = (path: string, mode: 'copy' | 'reference') => {
+    setDroppedIso(null)
+    guard(async () => {
+      if (mode === 'copy') toasts.push('info', `Copying ${fileName(path)}`, 'Big ISOs take a minute.')
+      const final = await window.vmm.importIso(path, mode)
+      setHost(await window.vmm.host())
+      // a new VM with the ISO in the drive, ready to fill in
+      const cfg = await window.vmm.newConfig()
+      if (!startDraft({ ...cfg, iso: final, bootFromIso: true })) toasts.push('ok', `Added ${fileName(final)}`, 'Pick it under CD/DVD on the Hardware tab.')
+    }, 'Could not add the ISO')
+  }
 
   const onSave = (cfg: VmConfig, previousName?: string) =>
     guard(async () => {
@@ -132,7 +174,21 @@ export default function App() {
   const onPower = (a: PowerAction) => current && guard(() => window.vmm.power(current.name, a), 'Power action failed')
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      onDragEnter={(e) => {
+        if (!hasFiles(e)) return
+        dragDepth.current++
+        setDragging(true)
+      }}
+      onDragOver={(e) => hasFiles(e) && e.preventDefault()}
+      onDragLeave={(e) => {
+        if (!hasFiles(e)) return
+        dragDepth.current = Math.max(0, dragDepth.current - 1)
+        if (dragDepth.current === 0) setDragging(false)
+      }}
+      onDrop={onDrop}
+    >
       <header className="titlebar">
         <img className="app-icon" src="./icon.svg" alt="" />
         <span>Virtual Machine Manager</span>
@@ -161,7 +217,7 @@ export default function App() {
         />
         {current ? (
           <VmDetail
-            key={draft ? '__draft' : current.name}
+            key={draft ? `__draft${draftKey}` : current.name}
             vm={current}
             isDraft={Boolean(draft)}
             status={status}
@@ -176,7 +232,7 @@ export default function App() {
         ) : (
           <main className="empty">
             <p className="empty-title">No virtual machines</p>
-            <p>Create one, then pick an installer ISO from your ISOs folder.</p>
+            <p>Create one, then pick an installer ISO from your ISOs folder. You can also drop an .iso file here.</p>
             <button className="btn primary" onClick={onNew}>
               New virtual machine
             </button>
@@ -186,6 +242,31 @@ export default function App() {
       <StatusBar host={host} running={Object.values(states).filter((s) => s !== 'off').length} />
       <Toasts items={toasts.items} dismiss={toasts.dismiss} />
       {setupFor && <GuestSetup vm={setupFor.vm} reason={setupFor.reason} onClose={() => setSetupFor(null)} />}
+      {dragging && (
+        <div className="drop-overlay" aria-hidden>
+          <span>Drop an .iso to make a VM from it</span>
+        </div>
+      )}
+      {droppedIso && (
+        <Modal
+          title="Add ISO"
+          onClose={() => setDroppedIso(null)}
+          footer={
+            <>
+              <span className="spacer" />
+              <button className="btn" onClick={() => importIso(droppedIso, 'reference')}>
+                Use it where it is
+              </button>
+              <button className="btn primary" onClick={() => importIso(droppedIso, 'copy')}>
+                Copy to ISOs folder
+              </button>
+            </>
+          }
+        >
+          <p className="mono">{droppedIso}</p>
+          <p className="muted">Copying keeps the VM working if the original file is moved or deleted. A new VM opens with this ISO in its CD/DVD drive.</p>
+        </Modal>
+      )}
     </div>
   )
 }

@@ -87,6 +87,10 @@ export interface VmmApi {
   profileShot(name: string, tag: string): Promise<string | null>
   /** the command to type into a Linux guest once so Save state (hibernate) works there */
   guestSetupCommand(): Promise<string>
+  /** the full path of a file dropped on the window */
+  pathForFile(file: File): string
+  /** reference: keep it where it is. copy: copy it into the ISOs folder. Returns the path to use */
+  importIso(path: string, mode: 'copy' | 'reference'): Promise<string>
   openDataFolder(): Promise<void>
   openLog(name: string): Promise<void>
   readLog(name: string): Promise<string>
