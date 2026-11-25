@@ -18,8 +18,11 @@ export default function Preview({ name, status }: { name: string; status: VmStat
   const [src, setSrc] = useState<string | null>(null)
 
   useEffect(() => {
-    setSrc(null)
-    if (status !== 'running' && status !== 'paused') return
+    // keep the last frame when a VM is suspended or resumed, there's nothing to show once it's off
+    if (status !== 'running' && status !== 'paused') {
+      setSrc(null)
+      return
+    }
     let live = true
     let busy = false // one request at a time, a focus event mid-request must not start a second loop
     let timer: number | undefined
