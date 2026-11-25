@@ -24,10 +24,28 @@ export async function importIso(src: string, isosDir: string, mode: 'copy' | 're
   // a different file with the same name gets a number
   const stem = basename(src, extname(src))
   let target = join(isosDir, basename(src))
-  for (let i = 2; existsSync(target); i++) {
-    if (target.toLowerCase() === src.toLowerCase() || statSync(target).size === size) return target
+  for (let i = 2; ; i++) {
+    const running = copying.get(target.toLowerCase())
+    if (running) {
+      // the same file dropped again while its copy is still going: wait for that one
+      if (running.src.toLowerCase() === src.toLowerCase()) return running.done
+    } else if (!existsSync(target)) {
+      break
+    } else if (target.toLowerCase() === src.toLowerCase() || statSync(target).size === size) {
+      return target
+    }
     target = join(isosDir, `${stem} (${i}).iso`)
   }
+  const key = target.toLowerCase()
+  const done = copyInto(src, target).finally(() => copying.delete(key))
+  copying.set(key, { src, done })
+  return done
+}
+
+/** copies running right now, by lowercased target path */
+const copying = new Map<string, { src: string; done: Promise<string> }>()
+
+async function copyInto(src: string, target: string): Promise<string> {
   // copy under a name the ISO list ignores, so a half-copied file never shows up as bootable
   const part = `${target}.part`
   try {
