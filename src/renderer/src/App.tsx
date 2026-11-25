@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { VmConfig } from '@shared/config'
-import type { HostInfo, PowerAction, VmRuntimeState, VmStatus } from '@shared/ipc'
+import type { HostInfo, PowerAction, VmRuntimeState, VmStatus, VmUsage } from '@shared/ipc'
 import Sidebar from './components/Sidebar'
 import Toolbar from './components/Toolbar'
 import VmDetail from './components/VmDetail'
@@ -10,10 +10,13 @@ import GuestSetup from './components/GuestSetup'
 import Modal from './components/Modal'
 import { errText, fileName } from './util'
 
+const HISTORY = 60 // usage samples kept per VM, 2 s apart = two minutes
+
 export default function App() {
   const [host, setHost] = useState<HostInfo | null>(null)
   const [vms, setVms] = useState<VmConfig[]>([])
   const [states, setStates] = useState<Record<string, VmStatus>>({})
+  const [usage, setUsage] = useState<Record<string, VmUsage[]>>({})
   const [selected, setSelected] = useState<string | null>(null)
   const [draft, setDraft] = useState<VmConfig | null>(null) // new VM that isn't saved yet
   const [busy, setBusy] = useState(false)
@@ -40,10 +43,19 @@ export default function App() {
     window.vmm.states().then((all) => setStates(Object.fromEntries(all.map((s) => [s.name, s.status]))))
     const offState = window.vmm.onState((s: VmRuntimeState) => {
       setStates((cur) => ({ ...cur, [s.name]: s.status }))
+      if (s.status === 'off') setUsage(({ [s.name]: _gone, ...rest }) => rest)
       if (s.status === 'off') setHibernating((cur) => (cur.has(s.name) ? new Set([...cur].filter((n) => n !== s.name)) : cur))
     })
     const offCrash = window.vmm.onCrash((c) => toasts.push('error', `${c.name} failed to start`, c.message))
     // an ISO was added to or removed from the ISOs folder
+    const offUsage = window.vmm.onUsage((u) =>
+      setUsage((cur) => {
+        // VMs missing from a sample have stopped, their history goes with them
+        const next: Record<string, VmUsage[]> = {}
+        for (const [name, sample] of Object.entries(u)) next[name] = [...(cur[name] ?? []), sample].slice(-HISTORY)
+        return next
+      })
+    )
     const offHost = window.vmm.onHostChanged(() => window.vmm.host().then(setHost))
     // only now, with the listeners above in place, so a VM that fails at once still shows up
     window.vmm
@@ -59,12 +71,14 @@ export default function App() {
       offState()
       offCrash()
       offHost()
+      offUsage()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const current = useMemo(() => draft ?? vms.find((v) => v.name === selected) ?? null, [draft, vms, selected])
   const status: VmStatus = current && !draft ? states[current.name] ?? 'off' : 'off'
+  const latestUsage = useMemo(() => Object.fromEntries(Object.entries(usage).map(([n, h]) => [n, h[h.length - 1]])), [usage])
 
   const guard = async (fn: () => Promise<unknown>, failTitle: string) => {
     setBusy(true)
@@ -208,6 +222,7 @@ export default function App() {
         <Sidebar
           vms={vms}
           states={states}
+          usage={latestUsage}
           selected={draft ? null : selected}
           draftName={draft?.name ?? null}
           onSelect={(n) => {
@@ -222,6 +237,7 @@ export default function App() {
             isDraft={Boolean(draft)}
             status={status}
             host={host}
+            usage={draft ? [] : usage[current.name] ?? []}
             onSave={onSave}
             onCancelDraft={() => setDraft(null)}
             onDelete={onDelete}
