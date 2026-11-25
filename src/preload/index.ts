@@ -38,6 +38,7 @@ const api: VmmApi = {
   readLog: (name) => ipcRenderer.invoke('readLog', name),
   onState: (cb) => listen('vm:state', cb),
   onCrash: (cb) => listen('vm:crash', cb),
+  onUsage: (cb) => listen('vm:usage', cb),
   onHostChanged: (cb) => listen('host:changed', () => cb())
 }
 
