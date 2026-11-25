@@ -25,6 +25,7 @@ I wanted something that feels like VMware Workstation but is free and fully mine
 - Hyper-V acceleration (WHPX) when Windows Hypervisor Platform is on, and plain emulation (TCG) when it isn't
 - Fast defaults: virtio disk and network, q35 machine, USB tablet so the mouse isn't captured
 - **Auto-start:** mark a VM to start when the app opens, and optionally resume its save state
+- **Live preview:** the Summary tab shows the running VM's screen, refreshed every 2 seconds while the app is in front
 
 **Save your place**
 - **Save state:** close a VM and pick up where you left off next time you power it on
