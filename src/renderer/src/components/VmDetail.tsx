@@ -188,7 +188,7 @@ function Usage({ usage, ramMB }: { usage: VmUsage[]; ramMB: number }) {
   // QEMU itself needs some memory on top of the guest's
   const memMax = Math.max(ramMB + 512, ...usage.map((u) => u.memMB))
   return (
-    <div className="usage" aria-label="Resource use">
+    <div className="usage" role="group" aria-label="Resource use">
       <div className="usage-item">
         <span className="muted">CPU</span>
         <strong>{last ? `${last.cpuPercent.toFixed(0)}%` : '…'}</strong>
