@@ -34,7 +34,8 @@ const api: VmmApi = {
   openLog: (name) => ipcRenderer.invoke('openLog', name),
   readLog: (name) => ipcRenderer.invoke('readLog', name),
   onState: (cb) => listen('vm:state', cb),
-  onCrash: (cb) => listen('vm:crash', cb)
+  onCrash: (cb) => listen('vm:crash', cb),
+  onHostChanged: (cb) => listen('host:changed', () => cb())
 }
 
 contextBridge.exposeInMainWorld('vmm', api)
