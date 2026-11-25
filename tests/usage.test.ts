@@ -112,6 +112,18 @@ describe.skipIf(process.platform !== 'win32')('PowerShellQuery', () => {
     }
   }, 30_000)
 
+  it('a closed PowerShell exiting late does not answer the next question', async () => {
+    const q = new PowerShellQuery()
+    try {
+      await q.query([process.pid]) // starts a PowerShell
+      q.close() // killed, its exit event comes a bit later
+      const rows = await q.query([process.pid]) // asked of a new one right away
+      expect(rows).toHaveLength(1)
+    } finally {
+      q.close()
+    }
+  }, 30_000)
+
   it('gives up on a PowerShell that does not answer in time', async () => {
     const q = new PowerShellQuery(1) // no PowerShell starts in 1 ms
     try {

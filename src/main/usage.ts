@@ -68,7 +68,10 @@ export class PowerShellQuery implements ProcessQuery {
     if (this.ps && this.ps.exitCode === null) return this.ps
     const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', SCRIPT], { windowsHide: true })
     ps.stdout.setEncoding('utf8')
+    // never read, but a full stderr pipe would block PowerShell, so drain it
+    ps.stderr.resume()
     ps.stdout.on('data', (d: string) => {
+      if (this.ps !== ps) return // a process close() already replaced
       this.buf += d
       let nl: number
       while ((nl = this.buf.indexOf('\n')) >= 0) {
@@ -78,14 +81,20 @@ export class PowerShellQuery implements ProcessQuery {
         try {
           rows = line ? JSON.parse(line) : []
         } catch {
-          /* half a line or a PowerShell warning, skip it */
+          // something other than our JSON, e.g. a warning. It answers this question with
+          // nothing, the round is skipped, and the real answer after it is ignored.
         }
         this.answer(Array.isArray(rows) ? rows : [])
       }
     })
-    ps.on('error', () => this.answer([]))
+    // after close() these come from a process that's no longer ours, and must not
+    // answer a question meant for the new one
+    ps.on('error', () => {
+      if (this.ps === ps) this.answer([])
+    })
     ps.on('exit', () => {
-      if (this.ps === ps) this.ps = null
+      if (this.ps !== ps) return
+      this.ps = null
       this.answer([])
     })
     this.ps = ps
