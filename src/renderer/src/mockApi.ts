@@ -34,6 +34,7 @@ export function installMockApi(): void {
   const running = (name: string) => (states[name]?.status ?? 'off') !== 'off'
   // the first live save of each VM pretends the guest agent is missing, so the setup dialog can be tried
   const agentReady = new Set<string>()
+  const isos = ['C:\\Users\\you\\VMs\\ISOs\\kali-linux-2026.2-installer-amd64.iso', 'C:\\Users\\you\\VMs\\ISOs\\Parrot-home-7.3_amd64.iso']
 
   const api: VmmApi = {
     host: async () => ({
@@ -41,7 +42,7 @@ export function installMockApi(): void {
       qemuVersion: '11.1.0',
       accel: 'whpx',
       dataRoot: 'C:\\Users\\you\\VMs',
-      isos: ['C:\\Users\\you\\VMs\\ISOs\\kali-linux-2026.2-installer-amd64.iso', 'C:\\Users\\you\\VMs\\ISOs\\Parrot-home-7.3_amd64.iso'],
+      isos: [...isos],
       cpuCount: 24,
       totalRamMB: 31744
     }),
@@ -109,6 +110,14 @@ export function installMockApi(): void {
     },
     profileShot: async (name, tag) => fakeScreen(`${name} · ${tag}`),
     guestSetupCommand: async () => 'curl -sL 10.0.2.2:7777/s | sudo bash',
+    // a browser doesn't hand out real paths, pretend the file came from Downloads
+    pathForFile: (file) => `C:\\Users\\you\\Downloads\\${file.name}`,
+    importIso: async (path, mode) => {
+      await new Promise((r) => setTimeout(r, mode === 'copy' ? 800 : 100))
+      const final = mode === 'copy' ? `C:\\Users\\you\\VMs\\ISOs\\${path.split('\\').pop()}` : path
+      if (!isos.includes(final)) isos.push(final)
+      return final
+    },
     openDataFolder: async () => undefined,
     openLog: async () => undefined,
     readLog: async (name) => `> qemu-system-x86_64.exe -name ${name} -machine q35,accel=whpx,kernel-irqchip=off ...`,

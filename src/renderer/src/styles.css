@@ -304,3 +304,8 @@ fieldset:disabled input, fieldset:disabled select { color: var(--text-3); }
 .profile-actions { display: flex; align-items: center; gap: 2px; }
 .profile-edit { display: flex; flex-direction: column; gap: 5px; }
 .saving-note { margin: 8px 0 0; }
+
+/* drop an .iso on the window */
+.drop-overlay { position: fixed; inset: 8px; z-index: 30; display: grid; place-items: center; border: 2px dashed var(--accent); border-radius: 8px; background: rgba(27, 27, 28, .85); pointer-events: none; }
+.drop-overlay span { font-size: 15px; font-weight: 600; }
+.modal-body .mono { overflow-wrap: anywhere; }
