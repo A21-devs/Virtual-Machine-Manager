@@ -140,7 +140,7 @@ It's one maintainer, so expect a reply within a few days. More in [SUPPORT.md](S
 
 ## Contributing
 
-Bug reports and PRs are welcome. Issues labelled [good first issue](https://github.com/A21-devs/Virtual-Machine-Manager/labels/good%20first%20issue) are small and self-contained. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up and what a PR needs.
+Bug reports and PRs are welcome. Issues labelled [first issue](https://github.com/A21-devs/Virtual-Machine-Manager/labels/first%20issue) are small and self-contained. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up and what a PR needs.
 
 ## Credits
 
