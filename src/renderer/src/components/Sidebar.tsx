@@ -1,19 +1,21 @@
 import { useState } from 'react'
 import { Search } from 'lucide-react'
 import type { VmConfig } from '@shared/config'
-import type { VmStatus } from '@shared/ipc'
+import type { VmStatus, VmUsage } from '@shared/ipc'
 import OsMark from './OsMark'
 import { statusLabel } from '../util'
 
 interface Props {
   vms: VmConfig[]
   states: Record<string, VmStatus>
+  /** latest sample of each running VM */
+  usage: Record<string, VmUsage>
   selected: string | null
   draftName: string | null
   onSelect: (name: string) => void
 }
 
-export default function Sidebar({ vms, states, selected, draftName, onSelect }: Props) {
+export default function Sidebar({ vms, states, usage, selected, draftName, onSelect }: Props) {
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
   const shown = q ? vms.filter((v) => v.name.toLowerCase().includes(q)) : vms
@@ -40,6 +42,7 @@ export default function Sidebar({ vms, states, selected, draftName, onSelect }: 
         )}
         {shown.map((v) => {
           const s = states[v.name] ?? 'off'
+          const u = s === 'running' ? usage[v.name] : undefined
           return (
             <li key={v.name}>
               <button
@@ -50,7 +53,15 @@ export default function Sidebar({ vms, states, selected, draftName, onSelect }: 
               >
                 <OsMark os={v.os} />
                 <span className="row-name">{v.name}</span>
-                <span className={`row-state ${s}`}>{s === 'off' ? '' : statusLabel[s]}</span>
+                {u ? (
+                  // a running VM shows its CPU use instead of the word Running, still green
+                  <span className="row-state running" title={`${statusLabel[s]} · CPU ${u.cpuPercent.toFixed(0)}%`}>
+                    <span className="sr-only">{statusLabel[s]}, CPU </span>
+                    {u.cpuPercent.toFixed(0)}%
+                  </span>
+                ) : (
+                  <span className={`row-state ${s}`}>{s === 'off' ? '' : statusLabel[s]}</span>
+                )}
               </button>
             </li>
           )

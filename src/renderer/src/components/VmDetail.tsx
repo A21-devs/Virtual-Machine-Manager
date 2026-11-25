@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { validateVmName, type VmConfig } from '@shared/config'
-import type { HostInfo, VmStatus } from '@shared/ipc'
+import type { HostInfo, VmStatus, VmUsage } from '@shared/ipc'
 import OsMark from './OsMark'
 import Hardware from './Hardware'
 import LogView from './LogView'
 import Preview from './Preview'
 import Profiles from './Profiles'
+import Sparkline from './Sparkline'
 import type { PushToast } from './Toasts'
 import { errText, fileName, gb, statusLabel } from '../util'
 
@@ -14,6 +15,8 @@ interface Props {
   isDraft: boolean
   status: VmStatus
   host: HostInfo | null
+  /** CPU and memory samples of this VM, oldest first, empty while it's off */
+  usage: VmUsage[]
   onSave: (cfg: VmConfig, previousName?: string) => void
   onCancelDraft: () => void
   onDelete: (name: string) => void
@@ -74,7 +77,7 @@ export default function VmDetail(props: Props) {
       </nav>
 
       <div className="tab-body">
-        {tab === 'summary' && <Summary vm={vm} status={status} host={host} />}
+        {tab === 'summary' && <Summary vm={vm} status={status} host={host} usage={props.usage} />}
         {tab === 'hardware' && (
           <Hardware
             form={form}
@@ -97,7 +100,7 @@ export default function VmDetail(props: Props) {
   )
 }
 
-function Summary({ vm, status, host }: { vm: VmConfig; status: VmStatus; host: HostInfo | null }) {
+function Summary({ vm, status, host, usage }: { vm: VmConfig; status: VmStatus; host: HostInfo | null; usage: VmUsage[] }) {
   const [hasSave, setHasSave] = useState(false)
   const [discarding, setDiscarding] = useState(false)
   const [discardError, setDiscardError] = useState<string | null>(null)
@@ -161,7 +164,10 @@ function Summary({ vm, status, host }: { vm: VmConfig; status: VmStatus; host: H
   }
   return (
     <div className="summary">
-      <Preview name={vm.name} status={status} />
+      <div className="summary-left">
+        <Preview name={vm.name} status={status} />
+        {status !== 'off' && <Usage usage={usage} ramMB={vm.ramMB} />}
+      </div>
       <table className="props">
         <tbody>
           {rows.map(([k, v]) => (
@@ -172,6 +178,27 @@ function Summary({ vm, status, host }: { vm: VmConfig; status: VmStatus; host: H
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+/** Live CPU and memory of the QEMU process, with the last two minutes as sparklines. */
+function Usage({ usage, ramMB }: { usage: VmUsage[]; ramMB: number }) {
+  const last = usage[usage.length - 1]
+  // QEMU itself needs some memory on top of the guest's
+  const memMax = Math.max(ramMB + 512, ...usage.map((u) => u.memMB))
+  return (
+    <div className="usage" role="group" aria-label="Resource use">
+      <div className="usage-item">
+        <span className="muted">CPU</span>
+        <strong>{last ? `${last.cpuPercent.toFixed(0)}%` : '…'}</strong>
+        <Sparkline values={usage.map((u) => u.cpuPercent)} max={100} label="CPU use over the last two minutes" />
+      </div>
+      <div className="usage-item">
+        <span className="muted">Memory</span>
+        <strong>{last ? gb(last.memMB) : '…'}</strong>
+        <Sparkline values={usage.map((u) => u.memMB)} max={memMax} label="Memory use over the last two minutes" />
+      </div>
     </div>
   )
 }
