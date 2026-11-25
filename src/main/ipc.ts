@@ -11,6 +11,7 @@ import { importIso, listIsos, watchFolder } from './isos'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { Profiles } from './profiles'
 import { deleteConfig, listConfigs, saveConfig } from './store'
+import { UsageSampler } from './usage'
 import { QUICKSAVE, VmRunner } from './vmRunner'
 
 /** What the rest of the main process needs from the IPC layer. */
@@ -19,7 +20,7 @@ export interface Backend {
   configs: () => VmConfig[]
   /** Same as the renderer's Power on. With resume, a quick save state is loaded if there is one. */
   startVm: (name: string, resume: boolean) => Promise<StartResult>
-  /** stops background work (the ISO folder watcher) before the app quits */
+  /** stops background work (ISO folder watcher, usage sampler) before the app quits */
   dispose: () => void
 }
 
@@ -34,6 +35,10 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
 
   // new or removed ISOs show up without restarting the app
   const stopIsoWatch = watchFolder(paths.isos, () => send('host:changed'))
+
+  // CPU and memory of each running VM, every 2 s. Idle while nothing runs.
+  const usage = new UsageSampler(() => runner.pids(), (u) => send('vm:usage', u))
+  usage.start()
 
   const byName = (name: string): VmConfig => {
     const cfg = listConfigs(paths).find((c) => c.name === name)
@@ -187,5 +192,13 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     }
   })
 
-  return { runner, configs: () => listConfigs(paths), startVm, dispose: stopIsoWatch }
+  return {
+    runner,
+    configs: () => listConfigs(paths),
+    startVm,
+    dispose: () => {
+      stopIsoWatch()
+      usage.stop()
+    }
+  }
 }

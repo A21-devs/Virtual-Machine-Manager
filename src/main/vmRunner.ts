@@ -76,6 +76,13 @@ export class VmRunner extends EventEmitter {
     return this.running.get(name)?.qmp ?? null
   }
 
+  /** QEMU's process id for every VM that is running, for the usage sampler */
+  pids(): Map<string, number> {
+    const m = new Map<string, number>()
+    for (const [n, r] of this.running) if (r.proc.pid) m.set(n, r.proc.pid)
+    return m
+  }
+
   isRunning(name: string): boolean {
     return this.running.has(name)
   }

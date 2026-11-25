@@ -19,6 +19,12 @@ export interface HostInfo {
   totalRamMB: number
 }
 
+/** What a running VM's QEMU process uses. cpuPercent is of the whole PC (all cores = 100) */
+export interface VmUsage {
+  cpuPercent: number
+  memMB: number
+}
+
 export type PowerAction = 'pause' | 'resume' | 'reset' | 'shutdown' | 'kill'
 
 /**
@@ -98,6 +104,8 @@ export interface VmmApi {
   readLog(name: string): Promise<string>
   onState(cb: (s: VmRuntimeState) => void): () => void
   onCrash(cb: (c: { name: string; message: string }) => void): () => void
+  /** every 2 s while VMs run: CPU and memory of each running VM, by name */
+  onUsage(cb: (u: Record<string, VmUsage>) => void): () => void
   /** something in host() changed, for now the list of ISOs */
   onHostChanged(cb: () => void): () => void
 }

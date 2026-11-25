@@ -1,7 +1,7 @@
 ﻿// Fake backend so the UI can run in a normal browser (npm run dev:web).
 // Handy for working on layout without booting real VMs.
 import { defaultConfig, type VmConfig } from '@shared/config'
-import type { Profile, VmmApi, VmRuntimeState } from '@shared/ipc'
+import type { Profile, VmmApi, VmRuntimeState, VmUsage } from '@shared/ipc'
 
 // a gray "desktop" so the preview and profile thumbnails have something to show
 function fakeScreen(label: string): string {
@@ -128,6 +128,19 @@ export function installMockApi(): void {
       return () => stateListeners.delete(cb)
     },
     onCrash: () => () => undefined,
+    onUsage: (cb) => {
+      // made-up numbers that wobble a bit, so the UI has something to draw
+      const t = setInterval(() => {
+        const u: Record<string, VmUsage> = {}
+        for (const s of Object.values(states)) {
+          if (s.status === 'off') continue
+          const vm = vms.find((v) => v.name === s.name)
+          u[s.name] = { cpuPercent: s.status === 'paused' ? 0 : 4 + Math.random() * 18, memMB: Math.round((vm?.ramMB ?? 2048) * (0.55 + Math.random() * 0.05)) }
+        }
+        cb(u)
+      }, 2000)
+      return () => clearInterval(t)
+    },
     onHostChanged: () => () => undefined
   }
   window.vmm = api
