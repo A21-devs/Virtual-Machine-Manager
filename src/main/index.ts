@@ -43,7 +43,10 @@ let backend: Backend | null = null
 
 app.whenReady().then(() => {
   backend = registerIpc(dataPaths(), () => mainWindow)
-  app.on('before-quit', () => backend?.runner.killAll())
+  app.on('before-quit', () => {
+    backend?.dispose()
+    backend?.runner.killAll()
+  })
   // auto-start runs when the renderer asks for it (the 'autostart' IPC), once it can show errors
   createWindow()
   app.on('activate', () => {

@@ -92,4 +92,6 @@ export interface VmmApi {
   readLog(name: string): Promise<string>
   onState(cb: (s: VmRuntimeState) => void): () => void
   onCrash(cb: (c: { name: string; message: string }) => void): () => void
+  /** something in host() changed, for now the list of ISOs */
+  onHostChanged(cb: () => void): () => void
 }

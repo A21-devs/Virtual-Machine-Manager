@@ -37,6 +37,8 @@ export default function App() {
       if (s.status === 'off') setHibernating((cur) => (cur.has(s.name) ? new Set([...cur].filter((n) => n !== s.name)) : cur))
     })
     const offCrash = window.vmm.onCrash((c) => toasts.push('error', `${c.name} failed to start`, c.message))
+    // an ISO was added to or removed from the ISOs folder
+    const offHost = window.vmm.onHostChanged(() => window.vmm.host().then(setHost))
     // only now, with the listeners above in place, so a VM that fails at once still shows up
     window.vmm
       .autostart()
@@ -50,6 +52,7 @@ export default function App() {
     return () => {
       offState()
       offCrash()
+      offHost()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

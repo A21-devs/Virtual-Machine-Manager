@@ -116,7 +116,8 @@ export function installMockApi(): void {
       stateListeners.add(cb)
       return () => stateListeners.delete(cb)
     },
-    onCrash: () => () => undefined
+    onCrash: () => () => undefined,
+    onHostChanged: () => () => undefined
   }
   window.vmm = api
 }

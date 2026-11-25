@@ -1,5 +1,5 @@
 ﻿import { ipcMain, shell, type BrowserWindow } from 'electron'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { cpus, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { defaultConfig, type VmConfig } from '@shared/config'
@@ -7,6 +7,7 @@ import type { AutostartIssue, HostInfo, PowerAction, Profile, SaveStateResult, S
 import { agentHibernate } from './agent'
 import { runAutostart } from './autostart'
 import { GuestSetupServer } from './guestSetup'
+import { listIsos, watchFolder } from './isos'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { Profiles } from './profiles'
 import { deleteConfig, listConfigs, saveConfig } from './store'
@@ -18,6 +19,8 @@ export interface Backend {
   configs: () => VmConfig[]
   /** Same as the renderer's Power on. With resume, a quick save state is loaded if there is one. */
   startVm: (name: string, resume: boolean) => Promise<StartResult>
+  /** stops background work (the ISO folder watcher) before the app quits */
+  dispose: () => void
 }
 
 export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | null): Backend {
@@ -25,9 +28,12 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
   const guestSetup = new GuestSetupServer()
   const profiles = new Profiles(paths, runner)
 
-  const send = (channel: string, payload: unknown) => getWindow()?.webContents.send(channel, payload)
+  const send = (channel: string, payload?: unknown) => getWindow()?.webContents.send(channel, payload)
   runner.on('state', (s) => send('vm:state', s))
   runner.on('crash', (c) => send('vm:crash', c))
+
+  // new or removed ISOs show up without restarting the app
+  const stopIsoWatch = watchFolder(paths.isos, () => send('host:changed'))
 
   const byName = (name: string): VmConfig => {
     const cfg = listConfigs(paths).find((c) => c.name === name)
@@ -37,14 +43,7 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
 
   ipcMain.handle('host', async (): Promise<HostInfo> => {
     const qemuPath = findQemu(paths)
-    let isos: string[] = []
-    try {
-      isos = readdirSync(paths.isos)
-        .filter((f) => f.toLowerCase().endsWith('.iso'))
-        .map((f) => join(paths.isos, f))
-    } catch {
-      /* folder missing */
-    }
+    const isos = listIsos(paths.isos, listConfigs(paths))
     return {
       qemuPath,
       qemuVersion: qemuPath ? await qemuVersion(qemuPath) : null,
@@ -179,5 +178,5 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     }
   })
 
-  return { runner, configs: () => listConfigs(paths), startVm }
+  return { runner, configs: () => listConfigs(paths), startVm, dispose: stopIsoWatch }
 }
