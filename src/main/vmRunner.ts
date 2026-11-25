@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createWriteStream, existsSync } from 'node:fs'
+import { readFile, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
-import { constants, setPriority } from 'node:os'
+import { constants, setPriority, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { EventEmitter } from 'node:events'
 import type { VmConfig } from '@shared/config'
@@ -210,6 +211,26 @@ export class VmRunner extends EventEmitter {
   /** PNG of the current screen. QEMU writes the file itself, so the path has to be absolute. */
   async screendump(name: string, file: string): Promise<void> {
     await this.need(name).execute('screendump', { filename: file, format: 'png' })
+  }
+
+  private shotNo = 0
+
+  /**
+   * The current screen as PNG bytes, for the live preview. null when the VM is off,
+   * QMP isn't connected yet or the VM stops halfway, the preview just tries again later.
+   */
+  async screenPng(name: string): Promise<Buffer | null> {
+    if (!this.isRunning(name)) return null
+    // unique per call, so two VMs (or two quick calls) never write the same file
+    const file = join(tmpdir(), `vmm-preview-${process.pid}-${++this.shotNo}.png`)
+    try {
+      await this.screendump(name, file)
+      return await readFile(file)
+    } catch {
+      return null
+    } finally {
+      await rm(file, { force: true })
+    }
   }
 
   /**

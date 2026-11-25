@@ -59,4 +59,15 @@ describe.skipIf(!qemu)('VmRunner with real QEMU', () => {
     runner.kill(cfg.name)
     await waitFor(runner, cfg.name, 'off')
   })
+
+  it('takes a PNG of the screen for the live preview, and null once it is off', async () => {
+    expect(await runner.screenPng(cfg.name)).toBeNull()
+    await runner.start(cfg)
+    await waitFor(runner, cfg.name, 'running')
+    const png = await runner.screenPng(cfg.name)
+    expect(png?.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a') // PNG signature
+    runner.kill(cfg.name)
+    await waitFor(runner, cfg.name, 'off')
+    expect(await runner.screenPng(cfg.name)).toBeNull()
+  })
 })

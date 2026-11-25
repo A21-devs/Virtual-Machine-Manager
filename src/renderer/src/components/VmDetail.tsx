@@ -4,6 +4,7 @@ import type { HostInfo, VmStatus } from '@shared/ipc'
 import OsMark from './OsMark'
 import Hardware from './Hardware'
 import LogView from './LogView'
+import Preview from './Preview'
 import Profiles from './Profiles'
 import type { PushToast } from './Toasts'
 import { errText, fileName, gb, statusLabel } from '../util'
@@ -160,9 +161,7 @@ function Summary({ vm, status, host }: { vm: VmConfig; status: VmStatus; host: H
   }
   return (
     <div className="summary">
-      <div className={`screen ${status}`}>
-        <span>{status === 'off' ? 'Powered off' : status === 'paused' ? 'Suspended' : 'Running in its own window'}</span>
-      </div>
+      <Preview name={vm.name} status={status} />
       <table className="props">
         <tbody>
           {rows.map(([k, v]) => (

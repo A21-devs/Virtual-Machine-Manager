@@ -170,6 +170,12 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
   })
 
   ipcMain.handle('states', () => runner.allStates())
+
+  // the Summary tab's live screen
+  ipcMain.handle('preview', async (_e, name: string): Promise<string | null> => {
+    const png = await runner.screenPng(name)
+    return png ? `data:image/png;base64,${png.toString('base64')}` : null
+  })
   ipcMain.handle('openDataFolder', () => shell.openPath(paths.root))
   ipcMain.handle('openLog', (_e, name: string) => shell.openPath(join(paths.logs, `${name}.log`)))
   ipcMain.handle('readLog', (_e, name: string) => {

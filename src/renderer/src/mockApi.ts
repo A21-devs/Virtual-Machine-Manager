@@ -3,7 +3,7 @@
 import { defaultConfig, type VmConfig } from '@shared/config'
 import type { Profile, VmmApi, VmRuntimeState } from '@shared/ipc'
 
-// a gray "desktop" so the profile thumbnails have something to show
+// a gray "desktop" so the preview and profile thumbnails have something to show
 function fakeScreen(label: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#23262b"/><rect y="372" width="640" height="28" fill="#15171a"/><rect x="24" y="24" width="300" height="190" rx="4" fill="#2f343b"/><rect x="24" y="24" width="300" height="22" rx="4" fill="#3a4049"/><text x="36" y="40" fill="#cfd3d8" font-family="Segoe UI" font-size="12">${label}</text><text x="36" y="76" fill="#7fd18b" font-family="Consolas" font-size="12">user@vm:~$ _</text></svg>`
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
@@ -109,6 +109,8 @@ export function installMockApi(): void {
       profiles[name] = (profiles[name] ?? []).map((p) => (p.tag === tag ? { ...p, label: label.trim(), note: note.trim() } : p))
     },
     profileShot: async (name, tag) => fakeScreen(`${name} · ${tag}`),
+    // the clock changes every refresh, so it's easy to see the preview update
+    preview: async (name) => (running(name) ? fakeScreen(`${name} · ${new Date().toLocaleTimeString()}`) : null),
     guestSetupCommand: async () => 'curl -sL 10.0.2.2:7777/s | sudo bash',
     // a browser doesn't hand out real paths, pretend the file came from Downloads
     pathForFile: (file) => `C:\\Users\\you\\Downloads\\${file.name}`,

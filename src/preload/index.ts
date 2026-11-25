@@ -30,6 +30,7 @@ const api: VmmApi = {
   deleteProfile: (name, tag) => ipcRenderer.invoke('deleteProfile', name, tag),
   editProfile: (name, tag, label, note) => ipcRenderer.invoke('editProfile', name, tag, label, note),
   profileShot: (name, tag) => ipcRenderer.invoke('profileShot', name, tag),
+  preview: (name) => ipcRenderer.invoke('preview', name),
   pathForFile: (file) => webUtils.getPathForFile(file),
   importIso: (path, mode) => ipcRenderer.invoke('importIso', path, mode),
   openDataFolder: () => ipcRenderer.invoke('openDataFolder'),
