@@ -37,6 +37,13 @@ export function watchFolder(dir: string, onChange: () => void, delayMs = 400): (
   try {
     const w = watch(dir, () => {
       stopTimer()
+      // On Windows, deleting the watched folder doesn't emit 'error', it fires 'rename'
+      // for the folder in a tight loop. Stop there and report the (now empty) list once.
+      if (!existsSync(dir)) {
+        w.close()
+        onChange()
+        return
+      }
       timer = setTimeout(() => {
         timer = null
         onChange()

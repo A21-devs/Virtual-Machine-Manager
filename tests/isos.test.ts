@@ -72,12 +72,15 @@ describe('watchFolder', () => {
     expect(() => stop()).not.toThrow()
   })
 
-  it('survives the folder being deleted', async () => {
+  it('reports a deleted folder once, then stops watching', async () => {
     const sub = join(dir, 'ISOs')
     mkdirSync(sub)
-    const stop = watchFolder(sub, () => undefined, 50)
+    let calls = 0
+    const stop = watchFolder(sub, () => calls++, 50)
     rmSync(sub, { recursive: true, force: true })
-    await new Promise((r) => setTimeout(r, 200))
+    await waitFor(() => calls > 0)
+    await new Promise((r) => setTimeout(r, 300))
+    expect(calls).toBe(1)
     expect(() => stop()).not.toThrow()
   })
 })
