@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { defaultConfig } from '@shared/config'
 import type { VmRuntimeState } from '@shared/ipc'
 import { dataPaths, findQemu } from '../../src/main/paths'
+import { UsageSampler } from '../../src/main/usage'
 import { VmRunner } from '../../src/main/vmRunner'
 
 const root = mkdtempSync(join(tmpdir(), 'vmm-it-'))
@@ -70,4 +71,25 @@ describe.skipIf(!qemu)('VmRunner with real QEMU', () => {
     await waitFor(runner, cfg.name, 'off')
     expect(await runner.screenPng(cfg.name)).toBeNull()
   })
+
+  it('measures the memory and CPU of a running VM', async () => {
+    await runner.start(cfg)
+    await waitFor(runner, cfg.name, 'running')
+    const got: Record<string, { cpuPercent: number; memMB: number }>[] = []
+    const sampler = new UsageSampler(() => runner.pids(), (u) => got.push(u))
+    try {
+      await sampler.tick()
+      await new Promise((r) => setTimeout(r, 1000))
+      await sampler.tick()
+    } finally {
+      sampler.stop()
+      runner.kill(cfg.name)
+      await waitFor(runner, cfg.name, 'off')
+    }
+    expect(got).toHaveLength(2)
+    const u = got[1][cfg.name]
+    expect(u.memMB).toBeGreaterThan(20) // QEMU itself, the 256 MB guest is mostly untouched in the BIOS
+    expect(u.cpuPercent).toBeGreaterThanOrEqual(0)
+    expect(u.cpuPercent).toBeLessThanOrEqual(100)
+  }, 60_000)
 })
