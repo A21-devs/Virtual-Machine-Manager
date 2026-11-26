@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultConfig, normalizeConfig, validateVmName } from '@shared/config'
+import { defaultConfig, normalizeConfig, normalizeForwards, validateVmName } from '@shared/config'
 
 const DISKS = 'C:\\VMs\\disks'
 
@@ -48,6 +48,32 @@ describe('normalizeConfig', () => {
 
   it('survives null', () => {
     expect(normalizeConfig(null, DISKS).name).toBe('Untitled VM')
+  })
+
+  it('has no port forwards for configs that predate them', () => {
+    expect(normalizeConfig({ name: 'Kali' }, DISKS).forwards).toEqual([])
+    expect(normalizeConfig({ name: 'Kali', forwards: 'ssh' }, DISKS).forwards).toEqual([])
+  })
+})
+
+describe('normalizeForwards', () => {
+  it('drops broken entries and duplicate host ports', () => {
+    const f = normalizeForwards([
+      { proto: 'tcp', hostPort: 2222, guestPort: 22 },
+      { proto: 'tcp', hostPort: 2222, guestPort: 23 }, // same host port twice, QEMU would refuse to start
+      { proto: 'udp', hostPort: 2222, guestPort: 53 }, // same port on the other protocol is fine
+      { proto: 'tcp', hostPort: 0, guestPort: 22 },
+      { proto: 'tcp', hostPort: 70000, guestPort: 22 },
+      { proto: 'tcp', hostPort: 8080.5, guestPort: 80 },
+      null,
+      'ssh',
+      { proto: 'weird', hostPort: '8080', guestPort: '80' } // hand-edited file: strings and an unknown protocol
+    ])
+    expect(f).toEqual([
+      { proto: 'tcp', hostPort: 2222, guestPort: 22 },
+      { proto: 'udp', hostPort: 2222, guestPort: 53 },
+      { proto: 'tcp', hostPort: 8080, guestPort: 80 }
+    ])
   })
 })
 
