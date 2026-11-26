@@ -12,6 +12,10 @@ interface Props {
 /** Plain dialog: Esc closes, focus starts on the first field and goes back where it was afterwards. */
 export default function Modal({ title, onClose, children, footer, width = 460 }: Props) {
   const box = useRef<HTMLDivElement>(null)
+  // the Esc listener is added once, so it reads the latest onClose from here. Otherwise it keeps
+  // the one from the first render, and a dialog that refuses to close while busy still closes on Esc
+  const close = useRef(onClose)
+  close.current = onClose
 
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null
@@ -20,7 +24,7 @@ export default function Modal({ title, onClose, children, footer, width = 460 }:
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        onClose()
+        close.current()
       }
     }
     window.addEventListener('keydown', onKey, true)
