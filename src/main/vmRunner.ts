@@ -47,6 +47,16 @@ function freePort(): Promise<number> {
   })
 }
 
+/** true when nothing is listening on 127.0.0.1:port, which is where port forwards bind */
+export function isPortFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const srv = createServer()
+    srv.unref()
+    srv.once('error', () => resolve(false))
+    srv.listen(port, '127.0.0.1', () => srv.close(() => resolve(true)))
+  })
+}
+
 export class VmRunner extends EventEmitter {
   private running = new Map<string, Running>()
 
@@ -101,6 +111,15 @@ export class VmRunner extends EventEmitter {
     if (this.running.has(cfg.name)) throw new Error(`${cfg.name} is already running`)
     const qemu = this.qemu()
     if (!qemu) throw new Error(NO_QEMU)
+
+    // QEMU only says "could not set up host forwarding rule" and quits, so check first and name the port
+    if (cfg.network === 'nat') {
+      for (const f of cfg.forwards) {
+        if (f.proto === 'tcp' && !(await isPortFree(f.hostPort))) {
+          throw new Error(`Port ${f.hostPort} on this PC is already in use, so it can't be forwarded to guest port ${f.guestPort}. Pick another host port under Hardware > Port forwarding.`)
+        }
+      }
+    }
 
     if (!existsSync(cfg.diskPath)) await this.img().create(cfg.diskPath, cfg.diskSizeGB)
 
