@@ -132,9 +132,13 @@ export default function Hardware({ form, setForm, host, locked, isDraft, dirty, 
         <Group title="Port forwarding">
           <Row
             label="Forwards"
-            hint={form.network === 'nat' ? 'Reach a service in the guest from this PC, for example ssh -p 2222 user@127.0.0.1' : 'Needs NAT networking'}
+            hint={
+              form.network === 'nat'
+                ? 'Reach a service in the guest from this PC, for example ssh -p 2222 user@127.0.0.1'
+                : 'Only used with NAT networking. You can set them up now, they start working once Network is NAT'
+            }
           >
-            <PortForwards forwards={form.forwards} disabled={form.network !== 'nat'} checkPorts={!locked} onChange={(f) => set('forwards', f)} />
+            <PortForwards forwards={form.forwards} checkPorts={!locked} onChange={(f) => set('forwards', f)} />
           </Row>
         </Group>
 

@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { validPort, type PortForward } from '@shared/config'
 
 interface Props {
   forwards: PortForward[]
   onChange: (f: PortForward[]) => void
-  disabled: boolean
   /** off while the VM runs, its own QEMU holds these ports then and every row would say "in use" */
   checkPorts: boolean
 }
@@ -24,9 +23,10 @@ export function forwardError(list: PortForward[], i: number): string | null {
   return null
 }
 
-export default function PortForwards({ forwards, onChange, disabled, checkPorts }: Props) {
+export default function PortForwards({ forwards, onChange, checkPorts }: Props) {
   // keyed "tcp:2222", the same port number can be free on one protocol and taken on the other
   const [inUse, setInUse] = useState<Record<string, boolean>>({})
+  const idBase = useId()
 
   // warn about host ports something else on this PC already has bound
   useEffect(() => {
@@ -72,26 +72,29 @@ export default function PortForwards({ forwards, onChange, disabled, checkPorts 
             {forwards.map((f, i) => {
               const err = forwardError(forwards, i)
               const busy = !err && inUse[`${f.proto}:${f.hostPort}`]
+              const noteId = `${idBase}-${i}`
+              // screen readers announce the row's problem with the port inputs, not only as a cell at the end
+              const described = err || busy ? noteId : undefined
               return (
                 <tr key={i}>
                   <td>
-                    <select aria-label="Protocol" value={f.proto} disabled={disabled} onChange={(e) => update(i, { proto: e.target.value as PortForward['proto'] })}>
+                    <select aria-label="Protocol" value={f.proto} onChange={(e) => update(i, { proto: e.target.value as PortForward['proto'] })}>
                       <option value="tcp">TCP</option>
                       <option value="udp">UDP</option>
                     </select>
                   </td>
                   <td>
-                    <input type="number" aria-label="Host port" min={1} max={65535} value={shown(f.hostPort)} disabled={disabled} onChange={(e) => update(i, { hostPort: port(e.target.value) })} />
+                    <input type="number" aria-label="Host port" aria-invalid={Boolean(err)} aria-describedby={described} min={1} max={65535} value={shown(f.hostPort)} onChange={(e) => update(i, { hostPort: port(e.target.value) })} />
                   </td>
                   <td>
-                    <input type="number" aria-label="Guest port" min={1} max={65535} value={shown(f.guestPort)} disabled={disabled} onChange={(e) => update(i, { guestPort: port(e.target.value) })} />
+                    <input type="number" aria-label="Guest port" aria-invalid={Boolean(err)} aria-describedby={described} min={1} max={65535} value={shown(f.guestPort)} onChange={(e) => update(i, { guestPort: port(e.target.value) })} />
                   </td>
                   <td>
-                    <button className="icon-btn danger" aria-label="Remove forward" disabled={disabled} onClick={() => onChange(forwards.filter((_f, j) => j !== i))}>
+                    <button className="icon-btn danger" aria-label="Remove forward" onClick={() => onChange(forwards.filter((_f, j) => j !== i))}>
                       <Trash2 size={14} />
                     </button>
                   </td>
-                  {(err || busy) && <td className={err ? 'prop-error' : 'warn-text'}>{err ?? 'In use on this PC right now'}</td>}
+                  {(err || busy) && <td id={noteId} className={err ? 'prop-error' : 'warn-text'}>{err ?? 'In use on this PC right now'}</td>}
                 </tr>
               )
             })}
@@ -99,11 +102,11 @@ export default function PortForwards({ forwards, onChange, disabled, checkPorts 
         </table>
       )}
       <div className="btn-row">
-        <button className="btn small" disabled={disabled} onClick={() => add({ proto: 'tcp', hostPort: 10022, guestPort: 22 })}>
+        <button className="btn small" onClick={() => add({ proto: 'tcp', hostPort: 10022, guestPort: 22 })}>
           <Plus size={13} /> Add
         </button>
         {PRESETS.map((p) => (
-          <button key={p.label} className="btn small" disabled={disabled} onClick={() => add(p.f)}>
+          <button key={p.label} className="btn small" onClick={() => add(p.f)}>
             {p.label}
           </button>
         ))}
