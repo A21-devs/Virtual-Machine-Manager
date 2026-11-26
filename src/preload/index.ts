@@ -31,6 +31,7 @@ const api: VmmApi = {
   editProfile: (name, tag, label, note) => ipcRenderer.invoke('editProfile', name, tag, label, note),
   profileShot: (name, tag) => ipcRenderer.invoke('profileShot', name, tag),
   preview: (name) => ipcRenderer.invoke('preview', name),
+  isPortFree: (port) => ipcRenderer.invoke('isPortFree', port),
   pathForFile: (file) => webUtils.getPathForFile(file),
   importIso: (path, mode) => ipcRenderer.invoke('importIso', path, mode),
   openDataFolder: () => ipcRenderer.invoke('openDataFolder'),

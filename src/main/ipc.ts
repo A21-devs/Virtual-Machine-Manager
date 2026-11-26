@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { cpus, totalmem } from 'node:os'
 import { join } from 'node:path'
-import { defaultConfig, type VmConfig } from '@shared/config'
+import { defaultConfig, validPort, type VmConfig } from '@shared/config'
 import type { AutostartIssue, HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
 import { agentHibernate } from './agent'
 import { runAutostart } from './autostart'
@@ -12,7 +12,7 @@ import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { Profiles } from './profiles'
 import { deleteConfig, listConfigs, saveConfig } from './store'
 import { UsageSampler } from './usage'
-import { QUICKSAVE, VmRunner } from './vmRunner'
+import { QUICKSAVE, VmRunner, isPortFree } from './vmRunner'
 
 /** What the rest of the main process needs from the IPC layer. */
 export interface Backend {
@@ -181,6 +181,8 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     const png = await runner.screenPng(name)
     return png ? `data:image/png;base64,${png.toString('base64')}` : null
   })
+  // the port forward editor warns about host ports something else already has
+  ipcMain.handle('isPortFree', (_e, port: unknown) => (typeof port === 'number' && validPort(port) ? isPortFree(port) : false))
   ipcMain.handle('openDataFolder', () => shell.openPath(paths.root))
   ipcMain.handle('openLog', (_e, name: string) => shell.openPath(join(paths.logs, `${name}.log`)))
   ipcMain.handle('readLog', (_e, name: string) => {
