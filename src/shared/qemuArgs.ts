@@ -66,8 +66,11 @@ export function buildQemuArgs(cfg: VmConfig, opts: LaunchOptions): string[] {
   push('-boot', 'menu=on')
 
   // ---- network ----
-  if (cfg.network === 'nat') push('-nic', `user,model=${cfg.nic}`)
-  else push('-nic', 'none')
+  if (cfg.network === 'nat') {
+    // forwards only listen on 127.0.0.1 so the guest isn't exposed to the rest of the network
+    const fwd = cfg.forwards.map((f) => `,hostfwd=${f.proto}:127.0.0.1:${f.hostPort}-:${f.guestPort}`).join('')
+    push('-nic', `user,model=${cfg.nic}${fwd}`)
+  } else push('-nic', 'none')
 
   // ---- graphics ----
   let gl = false

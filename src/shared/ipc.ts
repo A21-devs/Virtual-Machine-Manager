@@ -91,6 +91,8 @@ export interface VmmApi {
   editProfile(name: string, tag: string, label: string, note: string): Promise<void>
   /** the VM's current screen as a PNG data: URL, null when it's off or QEMU isn't answering yet */
   preview(name: string): Promise<string | null>
+  /** false when something on this PC already has 127.0.0.1:port bound for that protocol */
+  isPortFree(port: number, proto: 'tcp' | 'udp'): Promise<boolean>
   /** the screenshot as a data: URL */
   profileShot(name: string, tag: string): Promise<string | null>
   /** the command to type into a Linux guest once so Save state (hibernate) works there */

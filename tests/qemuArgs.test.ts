@@ -69,6 +69,18 @@ describe('buildQemuArgs', () => {
     expect(valueAfter(args, '-loadvm')).toBe('before-update')
   })
 
+  it('adds hostfwd rules bound to localhost', () => {
+    const forwards = [
+      { proto: 'tcp' as const, hostPort: 2222, guestPort: 22 },
+      { proto: 'udp' as const, hostPort: 5353, guestPort: 53 }
+    ]
+    expect(valueAfter(buildQemuArgs(base({ forwards }), opts()), '-nic')).toBe(
+      'user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=udp:127.0.0.1:5353-:53'
+    )
+    // no network, nothing to forward
+    expect(valueAfter(buildQemuArgs(base({ forwards, network: 'none' }), opts()), '-nic')).toBe('none')
+  })
+
   it('appends extra args last', () => {
     const args = buildQemuArgs(base({ extraArgs: '-device intel-hda' }), opts())
     expect(args.slice(-2)).toEqual(['-device', 'intel-hda'])

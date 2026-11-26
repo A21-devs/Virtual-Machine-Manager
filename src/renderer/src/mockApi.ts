@@ -12,7 +12,7 @@ function fakeScreen(label: string): string {
 export function installMockApi(): void {
   const disks = 'C:\\Users\\you\\VMs\\disks'
   let vms: VmConfig[] = [
-    { ...defaultConfig('Kali', disks), cpus: 8, ramMB: 8192, diskSizeGB: 100, iso: 'C:\\Users\\you\\VMs\\ISOs\\kali-linux-2026.2-installer-amd64.iso', diskBus: 'ide', nic: 'e1000' },
+    { ...defaultConfig('Kali', disks), cpus: 8, ramMB: 8192, diskSizeGB: 100, iso: 'C:\\Users\\you\\VMs\\ISOs\\kali-linux-2026.2-installer-amd64.iso', diskBus: 'ide', nic: 'e1000', forwards: [{ proto: 'tcp', hostPort: 2222, guestPort: 22 }] },
     { ...defaultConfig('Parrot Home', disks), cpus: 6, ramMB: 6144, autostart: true, resumeLast: true },
     { ...defaultConfig('Windows 11', disks), os: 'windows', cpus: 8, ramMB: 16384, firmware: 'uefi', diskSizeGB: 128 }
   ]
@@ -111,6 +111,8 @@ export function installMockApi(): void {
     profileShot: async (name, tag) => fakeScreen(`${name} · ${tag}`),
     // the clock changes every refresh, so it's easy to see the preview update
     preview: async (name) => (running(name) ? fakeScreen(`${name} · ${new Date().toLocaleTimeString()}`) : null),
+    // pretend Remote Desktop is on, so the in-use warning can be seen in dev:web
+    isPortFree: async (port, proto) => !(proto === 'tcp' && port === 3389),
     guestSetupCommand: async () => 'curl -sL 10.0.2.2:7777/s | sudo bash',
     // a browser doesn't hand out real paths, pretend the file came from Downloads
     pathForFile: (file) => `C:\\Users\\you\\Downloads\\${file.name}`,

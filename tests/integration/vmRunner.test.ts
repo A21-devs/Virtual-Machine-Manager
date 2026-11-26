@@ -1,6 +1,7 @@
 // Boots a real headless VM with no OS (it just sits in the BIOS) and drives it over QMP.
 // Needs QEMU installed. Run with: npm run test:qemu
 import { mkdtempSync, rmSync } from 'node:fs'
+import { createServer, type AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -8,7 +9,16 @@ import { defaultConfig } from '@shared/config'
 import type { VmRuntimeState } from '@shared/ipc'
 import { dataPaths, findQemu } from '../../src/main/paths'
 import { UsageSampler } from '../../src/main/usage'
-import { VmRunner } from '../../src/main/vmRunner'
+import { VmRunner, isPortFree } from '../../src/main/vmRunner'
+
+const freeTcpPort = () =>
+  new Promise<number>((resolve) => {
+    const s = createServer()
+    s.listen(0, '127.0.0.1', () => {
+      const port = (s.address() as AddressInfo).port
+      s.close(() => resolve(port))
+    })
+  })
 
 const root = mkdtempSync(join(tmpdir(), 'vmm-it-'))
 const paths = dataPaths(root)
@@ -71,6 +81,28 @@ describe.skipIf(!qemu)('VmRunner with real QEMU', () => {
     await waitFor(runner, cfg.name, 'off')
     expect(await runner.screenPng(cfg.name)).toBeNull()
   })
+
+  it('opens forwarded ports on 127.0.0.1 and refuses to start when one is taken', async () => {
+    const hostPort = await freeTcpPort()
+    const withFwd = { ...cfg, forwards: [{ proto: 'tcp' as const, hostPort, guestPort: 22 }] }
+    await runner.start(withFwd)
+    await waitFor(runner, cfg.name, 'running')
+    try {
+      expect(await isPortFree(hostPort)).toBe(false) // QEMU is listening on it now
+    } finally {
+      runner.kill(cfg.name)
+      await waitFor(runner, cfg.name, 'off')
+    }
+
+    const blocker = createServer()
+    await new Promise<void>((r) => blocker.listen(hostPort, '127.0.0.1', () => r()))
+    try {
+      await expect(runner.start(withFwd)).rejects.toThrow(`TCP port ${hostPort}`)
+      expect(runner.state(cfg.name).status).toBe('off')
+    } finally {
+      await new Promise((r) => blocker.close(r))
+    }
+  }, 30_000)
 
   it('measures the memory and CPU of a running VM', async () => {
     await runner.start(cfg)

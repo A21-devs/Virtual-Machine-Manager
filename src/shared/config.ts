@@ -10,6 +10,13 @@ export type VideoAdapter = 'qxl' | 'virtio' | 'std' | 'vmware'
 export type Accel = 'auto' | 'whpx' | 'tcg'
 export type DiskBus = 'virtio' | 'ide' | 'sata'
 
+/** A host port on 127.0.0.1 that QEMU's user networking passes through to the guest. */
+export interface PortForward {
+  proto: 'tcp' | 'udp'
+  hostPort: number
+  guestPort: number
+}
+
 export interface VmConfig {
   name: string
   os: OsType
@@ -29,6 +36,8 @@ export interface VmConfig {
   extraArgs: string
   // new in v0.1 (not in legacy configs)
   diskBus: DiskBus
+  /** only used with NAT networking */
+  forwards: PortForward[]
   /** start this VM when the app opens */
   autostart: boolean
   /** on autostart, restore the quick save state if there is one */
@@ -63,6 +72,7 @@ export function defaultConfig(name: string, diskDir: string): VmConfig {
     usbTablet: true,
     extraArgs: '',
     diskBus: 'virtio',
+    forwards: [],
     autostart: false,
     resumeLast: false
   }
@@ -95,9 +105,34 @@ export function normalizeConfig(raw: unknown, diskDir: string): VmConfig {
     usbTablet: typeof r.usbTablet === 'boolean' ? r.usbTablet : true,
     extraArgs: typeof r.extraArgs === 'string' ? r.extraArgs : '',
     diskBus: pick(r.diskBus, ['virtio', 'ide', 'sata'], 'ide'),
+    forwards: normalizeForwards(r.forwards),
     autostart: r.autostart === true,
     resumeLast: r.resumeLast === true
   }
+}
+
+export const validPort = (n: number): boolean => Number.isInteger(n) && n >= 1 && n <= 65535
+
+// a number, or digits from a hand-edited file. Number(true) is 1, so don't just call Number()
+const portNumber = (v: unknown): number => (typeof v === 'number' ? v : typeof v === 'string' && /^\d+$/.test(v.trim()) ? Number(v) : NaN)
+
+/** Drops broken entries and duplicate host ports (QEMU refuses to start with those). */
+export function normalizeForwards(raw: unknown): PortForward[] {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const out: PortForward[] = []
+  for (const f of raw as Record<string, unknown>[]) {
+    if (!f || typeof f !== 'object') continue
+    const proto = f.proto === 'udp' ? 'udp' : 'tcp'
+    const hostPort = portNumber(f.hostPort)
+    const guestPort = portNumber(f.guestPort)
+    if (!validPort(hostPort) || !validPort(guestPort)) continue
+    const key = `${proto}:${hostPort}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ proto, hostPort, guestPort })
+  }
+  return out
 }
 
 /** Names end up in file paths, so only allow what Windows is happy with. */

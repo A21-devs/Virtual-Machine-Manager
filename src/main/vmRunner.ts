@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createWriteStream, existsSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
+import { createSocket } from 'node:dgram'
 import { createServer } from 'node:net'
 import { constants, setPriority, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -44,6 +45,26 @@ function freePort(): Promise<number> {
       const addr = srv.address()
       srv.close(() => (typeof addr === 'object' && addr ? resolve(addr.port) : reject(new Error('no port'))))
     })
+  })
+}
+
+/** true when nothing has 127.0.0.1:port bound for that protocol, which is where port forwards bind */
+export function isPortFree(port: number, proto: 'tcp' | 'udp' = 'tcp'): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (proto === 'udp') {
+      const sock = createSocket('udp4')
+      sock.unref()
+      sock.once('error', () => {
+        sock.close()
+        resolve(false)
+      })
+      sock.bind(port, '127.0.0.1', () => sock.close(() => resolve(true)))
+      return
+    }
+    const srv = createServer()
+    srv.unref()
+    srv.once('error', () => resolve(false))
+    srv.listen(port, '127.0.0.1', () => srv.close(() => resolve(true)))
   })
 }
 
@@ -101,6 +122,15 @@ export class VmRunner extends EventEmitter {
     if (this.running.has(cfg.name)) throw new Error(`${cfg.name} is already running`)
     const qemu = this.qemu()
     if (!qemu) throw new Error(NO_QEMU)
+
+    // QEMU only says "could not set up host forwarding rule" and quits, so check first and name the port
+    if (cfg.network === 'nat') {
+      for (const f of cfg.forwards) {
+        if (!(await isPortFree(f.hostPort, f.proto))) {
+          throw new Error(`${f.proto.toUpperCase()} port ${f.hostPort} on this PC is already in use, so it can't be forwarded to guest port ${f.guestPort}. Pick another host port under Hardware > Port forwarding.`)
+        }
+      }
+    }
 
     if (!existsSync(cfg.diskPath)) await this.img().create(cfg.diskPath, cfg.diskSizeGB)
 
