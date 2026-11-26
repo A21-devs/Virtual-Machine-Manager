@@ -9,6 +9,7 @@ import Toasts, { useToasts } from './components/Toasts'
 import GuestSetup from './components/GuestSetup'
 import Modal from './components/Modal'
 import CloneDialog from './components/CloneDialog'
+import { guessPreset, suggestName } from '@shared/presets'
 import { errText, fileName } from './util'
 
 const HISTORY = 60 // usage samples kept per VM, 2 s apart = two minutes
@@ -125,9 +126,11 @@ export default function App() {
       if (mode === 'copy') toasts.push('info', `Copying ${fileName(path)}`, 'Big ISOs take a minute.')
       const final = await window.vmm.importIso(path, mode)
       setHost(await window.vmm.host())
-      // a new VM with the ISO in the drive, ready to fill in
+      // a new VM with the ISO in the drive, sized and named for the OS the file name points at
       const cfg = await window.vmm.newConfig()
-      if (!startDraft({ ...cfg, iso: final, bootFromIso: true })) toasts.push('ok', `Added ${fileName(final)}`, 'Pick it under CD/DVD on the Hardware tab.')
+      const name = suggestName(final, vms.map((v) => v.name))
+      const diskPath = cfg.diskPath.replace(/[^\\/]+$/, `${name}.qcow2`)
+      if (!startDraft({ ...cfg, ...guessPreset(final).values, name, diskPath, iso: final, bootFromIso: true })) toasts.push('ok', `Added ${fileName(final)}`, 'Pick it under CD/DVD on the Hardware tab.')
     }, 'Could not add the ISO')
   }
 
