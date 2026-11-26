@@ -322,3 +322,16 @@ fieldset:disabled input, fieldset:disabled select { color: var(--text-3); }
 .spark-fill { fill: var(--accent-bg); }
 .row-state.running { font-variant-numeric: tabular-nums; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- port forwards ---------- */
+.forwards { display: flex; flex-direction: column; gap: 8px; }
+.fwd-table { border-collapse: collapse; }
+.fwd-table th { text-align: left; font-weight: 400; font-size: 11.5px; color: var(--text-3); padding: 0 8px 4px 0; }
+.fwd-table td { padding: 2px 8px 2px 0; font-size: 11.5px; }
+.fwd-table input, .fwd-table select {
+  height: 28px; padding: 0 8px; min-width: 0;
+  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--r); outline: none;
+}
+.fwd-table input { width: 90px; }
+.fwd-table input:focus, .fwd-table select:focus { border-color: var(--accent); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
