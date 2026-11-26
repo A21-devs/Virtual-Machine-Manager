@@ -51,7 +51,7 @@ export default function Toolbar({ vm, status, busy, onNew, onStart, onPower, onS
         <Power size={ICON} /> Shut down
       </button>
       <span className="tb-sep" />
-      <button className="tb-btn" disabled={!vm || !off || busy} onClick={onClone} title={off ? 'Make a copy of this VM' : 'Power off to clone'}>
+      <button className="tb-btn" disabled={!vm || !off || busy} onClick={onClone} title={!vm ? undefined : off ? 'Make a copy of this VM' : 'Power off to clone'}>
         <Copy size={ICON} /> Clone
       </button>
       <span className="tb-sep" />

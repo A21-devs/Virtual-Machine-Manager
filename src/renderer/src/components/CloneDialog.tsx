@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { validateVmName } from '@shared/config'
 import Modal from './Modal'
+import { errText } from '../util'
 
 interface Props {
   source: string
   taken: string[]
-  /** resolves when the clone is done or has failed (the caller shows the result) */
+  /** resolves when the clone is done, throws when it failed (the error is shown in the dialog) */
   onClone: (name: string, linked: boolean) => Promise<void>
   onClose: () => void
 }
@@ -22,13 +23,18 @@ export default function CloneDialog({ source, taken, onClone, onClose }: Props) 
   const [name, setName] = useState(() => suggestCloneName(source, taken))
   const [linked, setLinked] = useState(true)
   const [busy, setBusy] = useState(false)
+  // shown in the dialog, a toast would end up under the modal backdrop
+  const [failed, setFailed] = useState<string | null>(null)
   const error = validateVmName(name) ?? (taken.some((t) => t.toLowerCase() === name.trim().toLowerCase()) ? 'A VM with this name already exists' : null)
 
   async function go() {
     if (error || busy) return
     setBusy(true)
+    setFailed(null)
     try {
       await onClone(name.trim(), linked)
+    } catch (e) {
+      setFailed(errText(e))
     } finally {
       setBusy(false)
     }
@@ -75,6 +81,11 @@ export default function CloneDialog({ source, taken, onClone, onClose }: Props) 
           </span>
         </label>
       </fieldset>
+      {failed && (
+        <p className="prop-error" role="alert">
+          Clone failed: {failed}
+        </p>
+      )}
       <p className="muted">Profiles stay with {source}. Port forwards are copied to free host ports, and auto-start is off for the copy.</p>
     </Modal>
   )

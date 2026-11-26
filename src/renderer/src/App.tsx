@@ -166,10 +166,8 @@ export default function App() {
       await refresh()
       setSelected(copy.name)
       toasts.push('ok', `Cloned to ${copy.name}`)
-    } catch (e) {
-      toasts.push('error', 'Clone failed', errText(e))
     } finally {
-      setBusy(false)
+      setBusy(false) // a failure is shown by the dialog, which stays open
     }
   }
 
