@@ -65,6 +65,9 @@ describe('normalizeForwards', () => {
       { proto: 'tcp', hostPort: 0, guestPort: 22 },
       { proto: 'tcp', hostPort: 70000, guestPort: 22 },
       { proto: 'tcp', hostPort: 8080.5, guestPort: 80 },
+      { proto: 'tcp', hostPort: true, guestPort: 22 }, // Number(true) would be port 1
+      { proto: 'tcp', hostPort: [2223], guestPort: 22 },
+      { proto: 'tcp', hostPort: '', guestPort: 22 },
       null,
       'ssh',
       { proto: 'weird', hostPort: '8080', guestPort: '80' } // hand-edited file: strings and an unknown protocol

@@ -113,6 +113,9 @@ export function normalizeConfig(raw: unknown, diskDir: string): VmConfig {
 
 export const validPort = (n: number): boolean => Number.isInteger(n) && n >= 1 && n <= 65535
 
+// a number, or digits from a hand-edited file. Number(true) is 1, so don't just call Number()
+const portNumber = (v: unknown): number => (typeof v === 'number' ? v : typeof v === 'string' && /^\d+$/.test(v.trim()) ? Number(v) : NaN)
+
 /** Drops broken entries and duplicate host ports (QEMU refuses to start with those). */
 export function normalizeForwards(raw: unknown): PortForward[] {
   if (!Array.isArray(raw)) return []
@@ -121,8 +124,8 @@ export function normalizeForwards(raw: unknown): PortForward[] {
   for (const f of raw as Record<string, unknown>[]) {
     if (!f || typeof f !== 'object') continue
     const proto = f.proto === 'udp' ? 'udp' : 'tcp'
-    const hostPort = Number(f.hostPort)
-    const guestPort = Number(f.guestPort)
+    const hostPort = portNumber(f.hostPort)
+    const guestPort = portNumber(f.guestPort)
     if (!validPort(hostPort) || !validPort(guestPort)) continue
     const key = `${proto}:${hostPort}`
     if (seen.has(key)) continue
