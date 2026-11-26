@@ -97,7 +97,7 @@ describe.skipIf(!qemu)('VmRunner with real QEMU', () => {
     const blocker = createServer()
     await new Promise<void>((r) => blocker.listen(hostPort, '127.0.0.1', () => r()))
     try {
-      await expect(runner.start(withFwd)).rejects.toThrow(`Port ${hostPort}`)
+      await expect(runner.start(withFwd)).rejects.toThrow(`TCP port ${hostPort}`)
       expect(runner.state(cfg.name).status).toBe('off')
     } finally {
       await new Promise((r) => blocker.close(r))

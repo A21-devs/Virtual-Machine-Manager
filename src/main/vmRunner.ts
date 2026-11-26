@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createWriteStream, existsSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
+import { createSocket } from 'node:dgram'
 import { createServer } from 'node:net'
 import { constants, setPriority, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -47,9 +48,19 @@ function freePort(): Promise<number> {
   })
 }
 
-/** true when nothing is listening on 127.0.0.1:port, which is where port forwards bind */
-export function isPortFree(port: number): Promise<boolean> {
+/** true when nothing has 127.0.0.1:port bound for that protocol, which is where port forwards bind */
+export function isPortFree(port: number, proto: 'tcp' | 'udp' = 'tcp'): Promise<boolean> {
   return new Promise((resolve) => {
+    if (proto === 'udp') {
+      const sock = createSocket('udp4')
+      sock.unref()
+      sock.once('error', () => {
+        sock.close()
+        resolve(false)
+      })
+      sock.bind(port, '127.0.0.1', () => sock.close(() => resolve(true)))
+      return
+    }
     const srv = createServer()
     srv.unref()
     srv.once('error', () => resolve(false))
@@ -115,8 +126,8 @@ export class VmRunner extends EventEmitter {
     // QEMU only says "could not set up host forwarding rule" and quits, so check first and name the port
     if (cfg.network === 'nat') {
       for (const f of cfg.forwards) {
-        if (f.proto === 'tcp' && !(await isPortFree(f.hostPort))) {
-          throw new Error(`Port ${f.hostPort} on this PC is already in use, so it can't be forwarded to guest port ${f.guestPort}. Pick another host port under Hardware > Port forwarding.`)
+        if (!(await isPortFree(f.hostPort, f.proto))) {
+          throw new Error(`${f.proto.toUpperCase()} port ${f.hostPort} on this PC is already in use, so it can't be forwarded to guest port ${f.guestPort}. Pick another host port under Hardware > Port forwarding.`)
         }
       }
     }

@@ -182,7 +182,9 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     return png ? `data:image/png;base64,${png.toString('base64')}` : null
   })
   // the port forward editor warns about host ports something else already has
-  ipcMain.handle('isPortFree', (_e, port: unknown) => (typeof port === 'number' && validPort(port) ? isPortFree(port) : false))
+  ipcMain.handle('isPortFree', (_e, port: unknown, proto: unknown) =>
+    typeof port === 'number' && validPort(port) ? isPortFree(port, proto === 'udp' ? 'udp' : 'tcp') : false
+  )
   ipcMain.handle('openDataFolder', () => shell.openPath(paths.root))
   ipcMain.handle('openLog', (_e, name: string) => shell.openPath(join(paths.logs, `${name}.log`)))
   ipcMain.handle('readLog', (_e, name: string) => {

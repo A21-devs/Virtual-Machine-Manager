@@ -112,7 +112,7 @@ export function installMockApi(): void {
     // the clock changes every refresh, so it's easy to see the preview update
     preview: async (name) => (running(name) ? fakeScreen(`${name} · ${new Date().toLocaleTimeString()}`) : null),
     // pretend Remote Desktop is on, so the in-use warning can be seen in dev:web
-    isPortFree: async (port) => port !== 3389,
+    isPortFree: async (port, proto) => !(proto === 'tcp' && port === 3389),
     guestSetupCommand: async () => 'curl -sL 10.0.2.2:7777/s | sudo bash',
     // a browser doesn't hand out real paths, pretend the file came from Downloads
     pathForFile: (file) => `C:\\Users\\you\\Downloads\\${file.name}`,
