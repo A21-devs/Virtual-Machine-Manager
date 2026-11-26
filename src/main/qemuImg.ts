@@ -52,7 +52,17 @@ export class QemuImg {
     return this.call(['create', '-f', 'qcow2', disk, `${sizeGB}G`])
   }
 
-  snapshotCreate = (disk: string, tag: string) => this.call(['snapshot', '-c', tag, disk])
+  /** A new disk that only stores changes on top of `backing`, which it reads but never writes. */
+  createOverlay(disk: string, backing: string): Promise<string> {
+    return this.call(['create', '-f', 'qcow2', '-b', backing, '-F', 'qcow2', disk])
+  }
+
+  /** Full copy. `-c` would compress but makes the guest slower later, so it's left off. */
+  convert(src: string, dest: string): Promise<string> {
+    return this.call(['convert', '-O', 'qcow2', src, dest], 60 * 60_000)
+  }
+
+  snapshotCreate =(disk: string, tag: string) => this.call(['snapshot', '-c', tag, disk])
   snapshotApply = (disk: string, tag: string) => this.call(['snapshot', '-a', tag, disk])
   snapshotDelete = (disk: string, tag: string) => this.call(['snapshot', '-d', tag, disk])
 }

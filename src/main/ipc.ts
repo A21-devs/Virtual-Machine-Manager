@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { defaultConfig, validPort, type VmConfig } from '@shared/config'
 import type { AutostartIssue, HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
 import { agentHibernate } from './agent'
+import { cloneVm } from './disks'
 import { runAutostart } from './autostart'
 import { GuestSetupServer } from './guestSetup'
 import { importIso, listIsos, watchFolder } from './isos'
@@ -73,6 +74,7 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
   })
 
   ipcMain.handle('save', (_e, cfg: VmConfig, previousName?: string) => {
+    notBusy(previousName ?? cfg.name)
     const saved = saveConfig(paths, cfg, previousName)
     // labels and screenshots are kept by VM name, so they have to move along
     if (previousName && previousName !== saved.name) {
@@ -86,19 +88,35 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     return saved
   })
 
-  // a profile save leaves the VM off for a while before booting it again
-  const notMidProfile = (name: string) => {
+  // a full clone reads the disk for minutes, nothing may start or change the VM meanwhile
+  const cloning = new Set<string>()
+
+  // a profile save leaves the VM off for a while before booting it again, and a clone needs it off throughout
+  const notBusy = (name: string) => {
+    if (cloning.has(name)) throw new Error(`${name} is being cloned. Wait for it to finish.`)
     if (profiles.isBusy(name)) throw new Error(`${name} is busy with a profile. Wait for it to finish.`)
   }
 
+  ipcMain.handle('clone', async (_e, name: string, newName: unknown, linked: unknown) => {
+    notBusy(name)
+    if (typeof newName !== 'string') throw new Error('Name is required')
+    cloning.add(name)
+    try {
+      const copy = await cloneVm(runner, paths, byName(name), newName, linked === true, listConfigs(paths))
+      return saveConfig(paths, copy)
+    } finally {
+      cloning.delete(name)
+    }
+  })
+
   ipcMain.handle('remove', (_e, name: string) => {
-    notMidProfile(name)
+    notBusy(name)
     if (runner.state(name).status !== 'off') throw new Error('Turn the VM off before deleting it')
     deleteConfig(paths, name) // the disk file is kept on purpose
   })
 
   const startVm = async (name: string, resume: boolean): Promise<StartResult> => {
-    notMidProfile(name)
+    notBusy(name)
     const cfg = byName(name)
     if (resume && (await runner.hasSaveState(cfg))) {
       await runner.start(cfg, { loadState: QUICKSAVE })
@@ -154,6 +172,7 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
   ipcMain.handle('hasSaveState', (_e, name: string) => runner.hasSaveState(byName(name)))
 
   ipcMain.handle('discardSaveState', async (_e, name: string) => {
+    notBusy(name)
     const cfg = byName(name)
     if (runner.isRunning(name)) throw new Error('Turn the VM off first')
     if (await runner.hasSaveState(cfg)) await runner.img().snapshotDelete(cfg.diskPath, QUICKSAVE)
@@ -161,8 +180,14 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
 
   ipcMain.handle('profiles', (_e, name: string) => profiles.list(byName(name)))
   ipcMain.handle('takeProfile', (_e, name: string, label: string, note: string): Promise<Profile> => profiles.take(byName(name), String(label), String(note ?? '')))
-  ipcMain.handle('launchProfile', (_e, name: string, tag: string, force: boolean) => profiles.launch(byName(name), tag, force === true))
-  ipcMain.handle('deleteProfile', (_e, name: string, tag: string) => profiles.remove(byName(name), tag))
+  ipcMain.handle('launchProfile', (_e, name: string, tag: string, force: boolean) => {
+    notBusy(name)
+    return profiles.launch(byName(name), tag, force === true)
+  })
+  ipcMain.handle('deleteProfile', (_e, name: string, tag: string) => {
+    notBusy(name)
+    return profiles.remove(byName(name), tag)
+  })
   ipcMain.handle('editProfile', (_e, name: string, tag: string, label: string, note: string) =>
     profiles.edit(byName(name), tag, String(label), String(note ?? ''))
   )
