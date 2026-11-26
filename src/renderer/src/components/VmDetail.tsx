@@ -5,6 +5,7 @@ import OsMark from './OsMark'
 import Hardware from './Hardware'
 import LogView from './LogView'
 import Preview from './Preview'
+import { forwardError } from './PortForwards'
 import Profiles from './Profiles'
 import Sparkline from './Sparkline'
 import type { PushToast } from './Toasts'
@@ -43,6 +44,7 @@ export default function VmDetail(props: Props) {
   const nameError = validateVmName(form.name)
   const diskError =
     !Number.isInteger(form.diskSizeGB) || form.diskSizeGB < 5 || form.diskSizeGB > 4096 ? 'Pick a whole number from 5 to 4096 GB' : null
+  const forwardsInvalid = form.forwards.some((_f, i) => forwardError(form.forwards, i) !== null)
 
   // the toolbar lives in App, it needs to know when Power on would ignore unsaved edits
   useEffect(() => {
@@ -88,6 +90,7 @@ export default function VmDetail(props: Props) {
             dirty={dirty}
             nameError={nameError}
             diskError={diskError}
+            forwardsInvalid={forwardsInvalid}
             onSave={() => onSave(form, vm.name)}
             onRevert={() => (isDraft ? onCancelDraft() : setForm(vm))}
             onDelete={() => onDelete(vm.name)}
@@ -145,6 +148,9 @@ function Summary({ vm, status, host, usage }: { vm: VmConfig; status: VmStatus; 
       )
     ],
     ['Network', vm.network === 'nat' ? `NAT · ${vm.nic}` : 'Disconnected'],
+    ...(vm.network === 'nat' && vm.forwards.length
+      ? [['Forwards', vm.forwards.map((f) => `${f.proto.toUpperCase()} ${f.hostPort} → ${f.guestPort}`).join(', ')] as [string, React.ReactNode]]
+      : []),
     ['Display', `${vm.video.toUpperCase()} · ${vm.display === 'auto' ? 'SDL' : vm.display.toUpperCase()} window`],
     ['Firmware', vm.firmware === 'uefi' ? 'UEFI' : 'BIOS'],
     ['Startup', vm.autostart ? `Starts with the app${vm.resumeLast ? ', resumes saved state' : ''}` : 'Manual'],

@@ -2,6 +2,7 @@ import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import type { VmConfig } from '@shared/config'
 import type { HostInfo } from '@shared/ipc'
 import { fileName, gb } from '../util'
+import PortForwards from './PortForwards'
 
 interface Props {
   form: VmConfig
@@ -12,12 +13,14 @@ interface Props {
   dirty: boolean
   nameError: string | null
   diskError: string | null
+  /** a port forward row has an error, Save stays off until it's fixed */
+  forwardsInvalid: boolean
   onSave: () => void
   onRevert: () => void
   onDelete: () => void
 }
 
-export default function Hardware({ form, setForm, host, locked, isDraft, dirty, nameError, diskError, onSave, onRevert, onDelete }: Props) {
+export default function Hardware({ form, setForm, host, locked, isDraft, dirty, nameError, diskError, forwardsInvalid, onSave, onRevert, onDelete }: Props) {
   const set = <K extends keyof VmConfig>(k: K, v: VmConfig[K]) => setForm((f) => ({ ...f, [k]: v }))
   const maxRam = host ? Math.max(1024, Math.floor((host.totalRamMB - 2048) / 512) * 512) : 32768
   const maxCpu = host?.cpuCount ?? 16
@@ -126,6 +129,19 @@ export default function Hardware({ form, setForm, host, locked, isDraft, dirty, 
           </Row>
         </Group>
 
+        <Group title="Port forwarding">
+          <Row
+            label="Forwards"
+            hint={
+              form.network === 'nat'
+                ? 'Reach a service in the guest from this PC, for example ssh -p 2222 user@127.0.0.1'
+                : 'Only used with NAT networking. You can set them up now, they start working once Network is NAT'
+            }
+          >
+            <PortForwards forwards={form.forwards} checkPorts={!locked} onChange={(f) => set('forwards', f)} />
+          </Row>
+        </Group>
+
         <Group title="Startup">
           <Row label="When the app opens">
             <label className="check">
@@ -169,7 +185,7 @@ export default function Hardware({ form, setForm, host, locked, isDraft, dirty, 
         <button className="btn" disabled={!dirty || locked} onClick={onRevert}>
           {isDraft ? 'Cancel' : 'Revert'}
         </button>
-        <button className="btn primary" disabled={!dirty || Boolean(nameError) || Boolean(diskError) || locked} onClick={onSave}>
+        <button className="btn primary" disabled={!dirty || Boolean(nameError) || Boolean(diskError) || forwardsInvalid || locked} onClick={onSave}>
           {isDraft ? 'Create' : 'Save'}
         </button>
       </div>
