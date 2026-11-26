@@ -20,17 +20,18 @@ export const PRESETS: Preset[] = [
   {
     id: 'windows11',
     label: 'Windows 11',
-    match: ['win11', 'windows 11', 'windows11', 'win_11'],
+    match: ['win11', 'windows 11', 'windows11'],
     // Windows has no virtio drivers out of the box, so stay on SATA + e1000 for the install
     values: { os: 'windows', cpus: 4, ramMB: 8192, diskSizeGB: 128, firmware: 'uefi', video: 'std', nic: 'e1000', diskBus: 'sata' }
   },
   {
     id: 'windows10',
     label: 'Windows 10',
-    match: ['win10', 'windows 10', 'windows10', 'win_10'],
+    match: ['win10', 'windows 10', 'windows10'],
     values: { os: 'windows', cpus: 4, ramMB: 4096, diskSizeGB: 64, firmware: 'bios', video: 'std', nic: 'e1000', diskBus: 'sata' }
   },
-  { id: 'other', label: 'Other', match: [], values: { ...linux, os: 'other', cpus: 2, ramMB: 2048, diskSizeGB: 32 } }
+  // anything we don't recognise: hardware every installer has drivers for, even if it's slower than virtio
+  { id: 'other', label: 'Other', match: [], values: { os: 'other', cpus: 2, ramMB: 2048, diskSizeGB: 32, firmware: 'bios', video: 'std', nic: 'e1000', diskBus: 'sata' } }
 ]
 
 export function presetById(id: string): Preset {

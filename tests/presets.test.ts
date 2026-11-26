@@ -43,3 +43,13 @@ describe('suggestName', () => {
     expect(suggestName('mystery.iso', ['New VM'])).toBe('New VM 2')
   })
 })
+
+describe('the Other preset', () => {
+  it('uses hardware any installer can see, since we know nothing about the OS', () => {
+    expect(guessPreset('WindowsServer2025_x64.iso').values).toMatchObject({ os: 'other', diskBus: 'sata', nic: 'e1000', video: 'std' })
+  })
+
+  it("matches Windows_11 with an underscore through the 'windows 11' entry", () => {
+    expect(guessPreset('Windows_11_ARM_preview.iso').id).toBe('windows11')
+  })
+})
