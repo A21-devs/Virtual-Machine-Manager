@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defaultConfig, type PortForward } from '@shared/config'
 import { shiftForwards } from '../src/main/disks'
+import { suggestCloneName } from '../src/renderer/src/components/CloneDialog'
 
 const withFwd = (name: string, forwards: PortForward[]) => ({ ...defaultConfig(name, 'C:\\VMs\\disks'), forwards })
 
@@ -29,5 +30,12 @@ describe('shiftForwards', () => {
   it('leaves forwards alone when nothing else uses the port', () => {
     const f: PortForward[] = [{ proto: 'tcp', hostPort: 3389, guestPort: 3389 }]
     expect(shiftForwards(f, [])).toEqual(f)
+  })
+})
+
+describe('suggestCloneName', () => {
+  it('picks the first free copy name, ignoring case', () => {
+    expect(suggestCloneName('Kali', ['Kali'])).toBe('Kali copy')
+    expect(suggestCloneName('Kali', ['Kali', 'kali COPY', 'Kali copy 2'])).toBe('Kali copy 3')
   })
 })

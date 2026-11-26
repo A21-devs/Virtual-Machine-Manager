@@ -8,6 +8,7 @@ import StatusBar from './components/StatusBar'
 import Toasts, { useToasts } from './components/Toasts'
 import GuestSetup from './components/GuestSetup'
 import Modal from './components/Modal'
+import CloneDialog from './components/CloneDialog'
 import { errText, fileName } from './util'
 
 const HISTORY = 60 // usage samples kept per VM, 2 s apart = two minutes
@@ -29,6 +30,7 @@ export default function App() {
   const [dragging, setDragging] = useState(false)
   const dragDepth = useRef(0) // dragenter/dragleave fire for every child, count them
   const [droppedIso, setDroppedIso] = useState<string | null>(null)
+  const [cloning, setCloning] = useState(false) // the clone dialog is open
   const toasts = useToasts()
 
   const refresh = useCallback(async () => {
@@ -146,6 +148,29 @@ export default function App() {
     }, 'Could not remove VM')
   }
 
+  const onClone = () => {
+    if (!current) return
+    if (unsaved) {
+      toasts.push('info', 'Unsaved hardware changes', 'Save or revert them on the Hardware tab first. The clone is made from the saved settings.')
+      return
+    }
+    setCloning(true)
+  }
+
+  const cloneTo = async (name: string, linked: boolean) => {
+    if (!current) return
+    setBusy(true) // keeps Power on and the rest of the toolbar off until the copy is done
+    try {
+      const copy = await window.vmm.clone(current.name, name, linked)
+      setCloning(false)
+      await refresh()
+      setSelected(copy.name)
+      toasts.push('ok', `Cloned to ${copy.name}`)
+    } finally {
+      setBusy(false) // a failure is shown by the dialog, which stays open
+    }
+  }
+
   const onStart = () => {
     if (!current) return
     if (unsaved) {
@@ -215,6 +240,7 @@ export default function App() {
         onStart={onStart}
         onPower={onPower}
         onSaveState={onSaveState}
+        onClone={onClone}
         saving={Boolean(current && hibernating.has(current.name))}
         saveHint={saveHint}
       />
@@ -257,6 +283,7 @@ export default function App() {
       </div>
       <StatusBar host={host} running={Object.values(states).filter((s) => s !== 'off').length} />
       <Toasts items={toasts.items} dismiss={toasts.dismiss} />
+      {cloning && current && !draft && <CloneDialog source={current.name} taken={vms.map((v) => v.name)} onClone={cloneTo} onClose={() => setCloning(false)} />}
       {setupFor && <GuestSetup vm={setupFor.vm} reason={setupFor.reason} onClose={() => setSetupFor(null)} />}
       {dragging && (
         <div className="drop-overlay" aria-hidden>

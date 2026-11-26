@@ -335,3 +335,14 @@ fieldset:disabled input, fieldset:disabled select { color: var(--text-3); }
 .fwd-table input { width: 90px; }
 .fwd-table input:focus, .fwd-table select:focus { border-color: var(--accent); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- form fields in dialogs ---------- */
+.field { display: flex; flex-direction: column; gap: 5px; margin: 0 0 14px; padding: 0; border: none; min-width: 0; }
+.field > span:first-child, .field legend { color: var(--text-2); font-size: 12px; padding: 0; margin-bottom: 2px; }
+.field input:not([type='radio']):not([type='checkbox']) {
+  height: 28px; padding: 0 8px; min-width: 0;
+  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--r); outline: none;
+}
+.field input:focus { border-color: var(--accent); }
+.radio { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; }
+.radio input { margin-top: 3px; accent-color: var(--accent); }

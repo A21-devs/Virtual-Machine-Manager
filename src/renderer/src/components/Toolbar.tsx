@@ -1,4 +1,4 @@
-import { Pause, Play, Plus, Power, RotateCcw, Save, Square } from 'lucide-react'
+import { Copy, Pause, Play, Plus, Power, RotateCcw, Save, Square } from 'lucide-react'
 import type { VmConfig } from '@shared/config'
 import type { PowerAction, VmStatus } from '@shared/ipc'
 
@@ -10,6 +10,7 @@ interface Props {
   onStart: () => void
   onPower: (a: PowerAction) => void
   onSaveState: () => void
+  onClone: () => void
   /** what Save state will do for this VM, shown as the tooltip */
   saveHint: string
   /** the guest is hibernating, Save state was already sent */
@@ -18,7 +19,7 @@ interface Props {
 
 const ICON = 16
 
-export default function Toolbar({ vm, status, busy, onNew, onStart, onPower, onSaveState, saveHint, saving }: Props) {
+export default function Toolbar({ vm, status, busy, onNew, onStart, onPower, onSaveState, onClone, saveHint, saving }: Props) {
   const off = status === 'off'
   const live = status === 'running' || status === 'paused'
   return (
@@ -49,6 +50,11 @@ export default function Toolbar({ vm, status, busy, onNew, onStart, onPower, onS
       <button className="tb-btn" disabled={!live || busy} onClick={() => onPower('shutdown')} title="Asks the guest OS to shut down">
         <Power size={ICON} /> Shut down
       </button>
+      <span className="tb-sep" />
+      <button className="tb-btn" disabled={!vm || !off || busy} onClick={onClone} title={!vm ? undefined : off ? 'Make a copy of this VM' : 'Power off to clone'}>
+        <Copy size={ICON} /> Clone
+      </button>
+      <span className="tb-sep" />
       <button className="tb-btn danger" disabled={off || !vm} onClick={() => onPower('kill')} title="Turns the VM off immediately, unsaved work in the guest is lost">
         <Square size={ICON} /> Force off
       </button>
