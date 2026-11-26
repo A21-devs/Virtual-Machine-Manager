@@ -101,6 +101,8 @@ export interface VmmApi {
   pathForFile(file: File): string
   /** reference: keep it where it is. copy: copy it into the ISOs folder. Returns the path to use */
   importIso(path: string, mode: 'copy' | 'reference'): Promise<string>
+  /** copies a powered-off VM under a new name and returns the new VM's config. linked = share the disk as a base */
+  clone(name: string, newName: string, linked: boolean): Promise<VmConfig>
   openDataFolder(): Promise<void>
   openLog(name: string): Promise<void>
   readLog(name: string): Promise<string>

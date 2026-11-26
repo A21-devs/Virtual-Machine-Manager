@@ -116,6 +116,17 @@ export function installMockApi(): void {
     guestSetupCommand: async () => 'curl -sL 10.0.2.2:7777/s | sudo bash',
     // a browser doesn't hand out real paths, pretend the file came from Downloads
     pathForFile: (file) => `C:\\Users\\you\\Downloads\\${file.name}`,
+    clone: async (name, newName, linked) => {
+      await new Promise((r) => setTimeout(r, linked ? 300 : 1500)) // a full copy takes a while
+      const src = vms.find((v) => v.name === name)
+      if (!src) throw new Error(`No VM called "${name}"`)
+      if (running(name)) throw new Error(`Power off ${name} before you clone it.`)
+      const n = newName.trim()
+      if (vms.some((v) => v.name.toLowerCase() === n.toLowerCase())) throw new Error(`A VM called "${n}" already exists`)
+      const copy = { ...src, name: n, diskPath: `${disks}\\${n}.qcow2`, autostart: false, resumeLast: false }
+      vms = [...vms, copy]
+      return copy
+    },
     importIso: async (path, mode) => {
       await new Promise((r) => setTimeout(r, mode === 'copy' ? 800 : 100))
       const final = mode === 'copy' ? `C:\\Users\\you\\VMs\\ISOs\\${path.split('\\').pop()}` : path

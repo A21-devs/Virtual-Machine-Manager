@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { defaultConfig, validPort, type VmConfig } from '@shared/config'
 import type { AutostartIssue, HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
 import { agentHibernate } from './agent'
+import { cloneVm } from './disks'
 import { runAutostart } from './autostart'
 import { GuestSetupServer } from './guestSetup'
 import { importIso, listIsos, watchFolder } from './isos'
@@ -90,6 +91,13 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
   const notMidProfile = (name: string) => {
     if (profiles.isBusy(name)) throw new Error(`${name} is busy with a profile. Wait for it to finish.`)
   }
+
+  ipcMain.handle('clone', async (_e, name: string, newName: unknown, linked: unknown) => {
+    notMidProfile(name)
+    if (typeof newName !== 'string') throw new Error('Name is required')
+    const copy = await cloneVm(runner, paths, byName(name), newName, linked === true, listConfigs(paths))
+    return saveConfig(paths, copy)
+  })
 
   ipcMain.handle('remove', (_e, name: string) => {
     notMidProfile(name)

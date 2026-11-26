@@ -34,6 +34,7 @@ const api: VmmApi = {
   isPortFree: (port, proto) => ipcRenderer.invoke('isPortFree', port, proto),
   pathForFile: (file) => webUtils.getPathForFile(file),
   importIso: (path, mode) => ipcRenderer.invoke('importIso', path, mode),
+  clone: (name, newName, linked) => ipcRenderer.invoke('clone', name, newName, linked),
   openDataFolder: () => ipcRenderer.invoke('openDataFolder'),
   openLog: (name) => ipcRenderer.invoke('openLog', name),
   readLog: (name) => ipcRenderer.invoke('readLog', name),
