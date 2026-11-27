@@ -1,6 +1,6 @@
 {
     "name": "virtual-machine-manager",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "A fast, good-looking desktop manager for QEMU virtual machines on Windows.",
     "main": "./out/main/index.js",
     "license": "MIT",
