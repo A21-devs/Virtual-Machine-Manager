@@ -284,7 +284,9 @@ export function registerIpc(ctx: IpcContext): Backend {
     const clean = normalizeSettings(s)
     if (clean.qemuPath && !(await checkQemu(clean.qemuPath))) throw new Error("That file doesn't run as QEMU. Pick qemu-system-x86_64.exe from your QEMU folder.")
     const envRoot = process.env.VMM_DATA_ROOT
-    if (!envRoot && clean.dataRoot.toLowerCase() !== paths.root.toLowerCase()) {
+    // only when the user picked another folder. Compared with the saved one, not paths.root: after
+    // a startup fallback those differ, and the unplugged folder must not block saving the rest
+    if (!envRoot && clean.dataRoot.toLowerCase() !== ctx.getSettings().dataRoot.toLowerCase()) {
       // a folder the app can't write would stop it from starting after the restart
       const problem = checkDataRoot(clean.dataRoot)
       if (problem) throw new Error(problem)
