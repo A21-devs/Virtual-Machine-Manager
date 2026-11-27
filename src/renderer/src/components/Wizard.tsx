@@ -112,7 +112,7 @@ export default function Wizard({ host, taken, initialIso = '', onCreate, onClose
 
       {step === 1 && (
         <div className="wiz-body">
-          <p className="muted">{iso ? `Guessed from ${fileName(iso)}. ` : ''}This only sets starting hardware, all of it can be changed later.</p>
+          <p className="muted">{iso && !touchedPreset ? `Guessed from ${fileName(iso)}. ` : ''}This only sets starting hardware, all of it can be changed later.</p>
           <div className="preset-grid" role="radiogroup" aria-label="Operating system">
             {PRESETS.map((p) => (
               <button key={p.id} role="radio" aria-checked={p.id === presetId} className={`preset ${p.id === presetId ? 'active' : ''}`} onClick={() => {
