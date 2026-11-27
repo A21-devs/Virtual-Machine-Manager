@@ -5,6 +5,19 @@ import type { DataPaths } from './paths'
 
 const configFile = (paths: DataPaths, name: string) => join(paths.vms, `${name}.json`)
 
+/**
+ * A disk file for a new VM called name that nothing uses yet: not a file in the disks folder
+ * (Remove keeps the disk, and a new VM must not boot an old one) and not the disk of another VM
+ * that hasn't been started yet. Adds " (2)", " (3)", ... until it is free.
+ */
+export function freeDiskPath(diskDir: string, name: string, used: string[], exists: (p: string) => boolean = existsSync): string {
+  const taken = new Set(used.map((p) => p.toLowerCase()))
+  for (let i = 1; ; i++) {
+    const p = join(diskDir, i === 1 ? `${name}.qcow2` : `${name} (${i}).qcow2`)
+    if (!taken.has(p.toLowerCase()) && !exists(p)) return p
+  }
+}
+
 export function listConfigs(paths: DataPaths): VmConfig[] {
   return readdirSync(paths.vms)
     .filter((f) => f.toLowerCase().endsWith('.json'))

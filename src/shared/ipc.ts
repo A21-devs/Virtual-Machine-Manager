@@ -66,7 +66,8 @@ export interface Profile {
 export interface VmmApi {
   host(): Promise<HostInfo>
   list(): Promise<VmConfig[]>
-  newConfig(): Promise<VmConfig>
+  /** defaults for a new VM. With a name, the disk file is named after it and never one that already exists */
+  newConfig(name?: string): Promise<VmConfig>
   save(cfg: VmConfig, previousName?: string): Promise<VmConfig>
   remove(name: string): Promise<void>
   /** resume: load the save state if the disk has one */

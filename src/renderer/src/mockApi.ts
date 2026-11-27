@@ -47,7 +47,7 @@ export function installMockApi(): void {
       totalRamMB: 31744
     }),
     list: async () => [...vms],
-    newConfig: async () => defaultConfig(`New VM ${vms.length + 1}`, disks),
+    newConfig: async (name) => defaultConfig(name?.trim() || `New VM ${vms.length + 1}`, disks),
     save: async (cfg, prev) => {
       if (prev && prev !== cfg.name && profiles[prev]) {
         profiles[cfg.name] = profiles[prev]

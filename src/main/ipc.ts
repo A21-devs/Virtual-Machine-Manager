@@ -11,7 +11,7 @@ import { GuestSetupServer } from './guestSetup'
 import { importIso, listIsos, watchFolder } from './isos'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { Profiles } from './profiles'
-import { deleteConfig, listConfigs, saveConfig } from './store'
+import { deleteConfig, freeDiskPath, listConfigs, saveConfig } from './store'
 import { UsageSampler } from './usage'
 import { QUICKSAVE, VmRunner, isPortFree } from './vmRunner'
 
@@ -74,11 +74,17 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     return r.canceled ? null : r.filePaths[0] ?? null
   })
 
-  ipcMain.handle('newConfig', () => {
-    const taken = new Set(listConfigs(paths).map((c) => c.name.toLowerCase()))
-    let i = 1
-    while (taken.has(`new vm ${i}`)) i++
-    return defaultConfig(`New VM ${i}`, paths.disks)
+  ipcMain.handle('newConfig', (_e, name?: string) => {
+    const all = listConfigs(paths)
+    let n = typeof name === 'string' ? name.trim() : ''
+    if (!n) {
+      const taken = new Set(all.map((c) => c.name.toLowerCase()))
+      let i = 1
+      while (taken.has(`new vm ${i}`)) i++
+      n = `New VM ${i}`
+    }
+    const cfg = defaultConfig(n, paths.disks)
+    return { ...cfg, diskPath: freeDiskPath(paths.disks, n, all.map((c) => c.diskPath)) }
   })
 
   ipcMain.handle('save', (_e, cfg: VmConfig, previousName?: string) => {
