@@ -22,6 +22,8 @@ export default function Wizard({ host, taken, initialIso = '', onCreate, onClose
   const [presetId, setPresetId] = useState(() => guessPreset(initialIso).id)
   const [name, setName] = useState(() => suggestName(initialIso, taken))
   const [touchedName, setTouchedName] = useState(false)
+  // once the type is picked by hand, choosing another ISO doesn't guess over it
+  const [touchedPreset, setTouchedPreset] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const isos = useMemo(() => {
@@ -35,7 +37,7 @@ export default function Wizard({ host, taken, initialIso = '', onCreate, onClose
 
   function chooseIso(path: string) {
     setIso(path)
-    setPresetId(guessPreset(path).id)
+    if (!touchedPreset) setPresetId(guessPreset(path).id)
     if (!touchedName) setName(suggestName(path, taken))
   }
 
@@ -48,10 +50,9 @@ export default function Wizard({ host, taken, initialIso = '', onCreate, onClose
     if (busy || nameError) return
     setBusy(true)
     try {
-      const base = await window.vmm.newConfig()
-      // the disk is named after the VM, not the "New VM n" placeholder newConfig picked
-      const disk = base.diskPath.replace(/[^\\/]+$/, `${name.trim()}.qcow2`)
-      await onCreate({ ...base, ...preset.values, name: name.trim(), iso, bootFromIso: Boolean(iso), diskPath: disk })
+      // the main process names the disk after the VM, and never after a disk file that is already there
+      const base = await window.vmm.newConfig(name.trim())
+      await onCreate({ ...base, ...preset.values, name: name.trim(), iso, bootFromIso: Boolean(iso) })
     } finally {
       setBusy(false)
     }
@@ -114,7 +115,10 @@ export default function Wizard({ host, taken, initialIso = '', onCreate, onClose
           <p className="muted">{iso ? `Guessed from ${fileName(iso)}. ` : ''}This only sets starting hardware, all of it can be changed later.</p>
           <div className="preset-grid" role="radiogroup" aria-label="Operating system">
             {PRESETS.map((p) => (
-              <button key={p.id} role="radio" aria-checked={p.id === presetId} className={`preset ${p.id === presetId ? 'active' : ''}`} onClick={() => setPresetId(p.id)}>
+              <button key={p.id} role="radio" aria-checked={p.id === presetId} className={`preset ${p.id === presetId ? 'active' : ''}`} onClick={() => {
+                  setTouchedPreset(true)
+                  setPresetId(p.id)
+                }}>
                 <strong>{p.label}</strong>
                 <span className="muted">
                   {p.values.cpus} cores · {gb(p.values.ramMB)} · {p.values.diskSizeGB} GB
