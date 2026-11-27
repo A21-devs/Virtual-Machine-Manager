@@ -19,8 +19,10 @@ export default function Modal({ title, onClose, children, footer, width = 460 }:
 
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null
-    const first = box.current?.querySelector<HTMLElement>('input, select, textarea, button:not(.modal-x)')
-    first?.focus()
+    // focus the first field, or the dialog itself. Never a button: the Enter that opened
+    // the dialog would otherwise go on to "click" it and close the dialog straight away.
+    const first = box.current?.querySelector<HTMLElement>('input, select, textarea')
+    ;(first ?? box.current)?.focus()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
@@ -37,7 +39,7 @@ export default function Modal({ title, onClose, children, footer, width = 460 }:
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title} ref={box} style={{ width }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={title} ref={box} tabIndex={-1} style={{ width }}>
         <header className="modal-head">
           <h2>{title}</h2>
           <button className="modal-x" aria-label="Close" onClick={onClose}>
