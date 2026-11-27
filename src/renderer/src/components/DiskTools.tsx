@@ -20,6 +20,7 @@ const MAX_GB = 16384
 /** Size of the disk file, plus Grow and Compact. Shown on the Hardware tab once the disk exists. */
 export default function DiskTools({ vm, status, dirty, toast, onChanged }: Props) {
   const [info, setInfo] = useState<DiskInfo | null>(null)
+  const [readError, setReadError] = useState<string | null>(null)
   const [grow, setGrow] = useState(vm.diskSizeGB)
   const [busy, setBusy] = useState<'grow' | 'compact' | null>(null)
   const off = status === 'off'
@@ -29,15 +30,20 @@ export default function DiskTools({ vm, status, dirty, toast, onChanged }: Props
       .diskInfo(vm.name)
       .then((i) => {
         setInfo(i)
+        setReadError(null)
         if (i.exists) setGrow(Math.ceil(i.virtualBytes / GB))
       })
-      .catch(() => setInfo(null))
+      .catch((e) => {
+        setInfo(null)
+        setReadError(errText(e))
+      })
   }, [vm.name])
 
   // the file changes size while the VM runs, so read it again on every power change
   useEffect(load, [load, status])
 
-  if (!info) return null
+  if (readError) return <span className="prop-error">Couldn't read the disk file: {readError}</span>
+  if (!info) return null // still loading
   if (!info.exists) return <span className="prop-hint">The disk file is made the first time the VM is powered on.</span>
 
   const current = Math.ceil(info.virtualBytes / GB)
@@ -58,6 +64,10 @@ export default function DiskTools({ vm, status, dirty, toast, onChanged }: Props
   }
 
   const blocked = !off ? 'Power off to grow or compact the disk.' : dirty ? 'Save or revert your hardware changes first.' : null
+  // the backend refuses these every time, say why up front instead of after a click
+  const snapshots = info.snapshotCount > 0 ? "Delete this VM's profiles and save state to grow or compact the disk, qemu-img can't do either with snapshots in it." : null
+  const noCompact = snapshots ?? (info.backingFile ? 'A linked clone can grow but not be compacted, that would copy the whole base disk into it.' : null)
+  const reason = blocked ?? noCompact
 
   return (
     <div className="disk-tools">
@@ -86,7 +96,7 @@ export default function DiskTools({ vm, status, dirty, toast, onChanged }: Props
         </div>
         <button
           className="btn small"
-          disabled={Boolean(blocked) || busy !== null || !canGrow}
+          disabled={Boolean(blocked) || Boolean(snapshots) || busy !== null || !canGrow}
           onClick={() =>
             run('grow', async () => {
               await window.vmm.resizeDisk(vm.name, grow)
@@ -98,7 +108,7 @@ export default function DiskTools({ vm, status, dirty, toast, onChanged }: Props
         </button>
         <button
           className="btn small"
-          disabled={Boolean(blocked) || busy !== null}
+          disabled={Boolean(blocked) || Boolean(noCompact) || busy !== null}
           title="Rewrites the disk file to give back space the guest has freed"
           onClick={() =>
             run('compact', async () => {
@@ -110,7 +120,7 @@ export default function DiskTools({ vm, status, dirty, toast, onChanged }: Props
           {busy === 'compact' ? 'Compacting…' : 'Compact'}
         </button>
       </div>
-      {blocked && <span className="prop-hint">{blocked}</span>}
+      {reason && <span className="prop-hint">{reason}</span>}
     </div>
   )
 }
