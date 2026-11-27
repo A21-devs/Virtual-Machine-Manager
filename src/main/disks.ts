@@ -2,10 +2,54 @@ import { chmodSync, existsSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { validateVmName, type PortForward, type VmConfig } from '@shared/config'
 import type { DataPaths } from './paths'
+import type { ImgSnapshot } from './qemuImg'
 import { QUICKSAVE, type VmRunner } from './vmRunner'
+
+const GB = 1024 ** 3
 
 function needOff(runner: VmRunner, cfg: VmConfig, what: string): void {
   if (runner.isRunning(cfg.name)) throw new Error(`Power off ${cfg.name} before you ${what}.`)
+}
+
+/** "save state" when the only snapshot is the quick save, "profiles" otherwise */
+const snapshotWord = (snaps: ImgSnapshot[]) => (snaps.every((s) => s.name === QUICKSAVE) ? 'save state' : 'profiles')
+
+/** Only growing is allowed. Shrinking a disk under the guest's partitions destroys data. */
+export async function resizeDisk(runner: VmRunner, cfg: VmConfig, sizeGB: number): Promise<void> {
+  needOff(runner, cfg, 'resize its disk')
+  if (!Number.isInteger(sizeGB) || sizeGB < 1 || sizeGB > 16384) throw new Error('Pick a whole number of GB between 1 and 16384')
+  if (!existsSync(cfg.diskPath)) return // no disk file yet, the new size is used when it's created
+  const img = runner.img()
+  const info = await img.info(cfg.diskPath)
+  if (sizeGB * GB < info.virtualBytes) throw new Error(`The disk is already ${Math.round(info.virtualBytes / GB)} GB. It can only grow.`)
+  if (sizeGB * GB === info.virtualBytes) return
+  if (info.snapshots.length > 0) throw new Error(`qemu-img can't resize a disk that has snapshots. Delete this VM's ${snapshotWord(info.snapshots)} first.`)
+  await img.resize(cfg.diskPath, sizeGB)
+}
+
+/** Rewrites the disk into a fresh file, which gives back the space the guest has freed. */
+export async function compactDisk(runner: VmRunner, cfg: VmConfig): Promise<{ before: number; after: number }> {
+  needOff(runner, cfg, 'compact its disk')
+  if (!existsSync(cfg.diskPath)) throw new Error('This VM has no disk file yet')
+  const img = runner.img()
+  const info = await img.info(cfg.diskPath)
+  // convert doesn't copy internal snapshots, they would be gone afterwards
+  if (info.snapshots.length > 0) throw new Error(`Compacting would throw away this VM's ${snapshotWord(info.snapshots)}. Delete it first if you really want to.`)
+  if (info.backingFile) throw new Error('This disk is a linked clone. Compacting it would copy the whole base disk into it.')
+  const tmp = `${cfg.diskPath}.compact.tmp`
+  const old = `${cfg.diskPath}.old`
+  rmSync(tmp, { force: true })
+  try {
+    await img.convert(cfg.diskPath, tmp)
+  } catch (e) {
+    rmSync(tmp, { force: true })
+    throw e
+  }
+  // two renames, so a complete copy is on disk at every moment
+  renameSync(cfg.diskPath, old)
+  renameSync(tmp, cfg.diskPath)
+  rmSync(old, { force: true })
+  return { before: info.actualBytes, after: (await img.info(cfg.diskPath)).actualBytes }
 }
 
 /**
@@ -58,7 +102,7 @@ export async function cloneVm(
   } else {
     const info = await img.info(cfg.diskPath)
     if (info.snapshots.length > 0) {
-      const what = info.snapshots.every((s) => s.name === QUICKSAVE) ? 'save state' : 'profiles'
+      const what = snapshotWord(info.snapshots)
       throw new Error(`A linked clone freezes the current disk as a shared base, and this VM's ${what} would be stuck inside it. Delete them first, or make a full clone.`)
     }
     const base = cfg.diskPath.replace(/\.qcow2$/i, '') + `.base-${Date.now().toString(36)}.qcow2`

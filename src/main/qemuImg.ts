@@ -57,6 +57,11 @@ export class QemuImg {
     return this.call(['create', '-f', 'qcow2', '-b', backing, '-F', 'qcow2', disk])
   }
 
+  /** Changes the size the guest sees. Only ever called to grow, see resizeDisk. */
+  resize(disk: string, sizeGB: number): Promise<string> {
+    return this.call(['resize', disk, `${sizeGB}G`])
+  }
+
   /** Full copy. `-c` would compress but makes the guest slower later, so it's left off. */
   convert(src: string, dest: string): Promise<string> {
     return this.call(['convert', '-O', 'qcow2', src, dest], 60 * 60_000)
