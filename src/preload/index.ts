@@ -13,7 +13,8 @@ const listen = <T>(channel: string, cb: (payload: T) => void) => {
 const api: VmmApi = {
   host: () => ipcRenderer.invoke('host'),
   list: () => ipcRenderer.invoke('list'),
-  newConfig: () => ipcRenderer.invoke('newConfig'),
+  newConfig: (name) => ipcRenderer.invoke('newConfig', name),
+  pickFile: (current, kind) => ipcRenderer.invoke('pickFile', current, kind),
   save: (cfg, previousName) => ipcRenderer.invoke('save', cfg, previousName),
   remove: (name) => ipcRenderer.invoke('remove', name),
   start: (name, opts) => ipcRenderer.invoke('start', name, opts),

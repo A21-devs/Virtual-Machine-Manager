@@ -9,7 +9,7 @@ import Toasts, { useToasts } from './components/Toasts'
 import GuestSetup from './components/GuestSetup'
 import Modal from './components/Modal'
 import CloneDialog from './components/CloneDialog'
-import { guessPreset, suggestName } from '@shared/presets'
+import Wizard from './components/Wizard'
 import { errText, fileName } from './util'
 
 const HISTORY = 60 // usage samples kept per VM, 2 s apart = two minutes
@@ -20,14 +20,13 @@ export default function App() {
   const [states, setStates] = useState<Record<string, VmStatus>>({})
   const [usage, setUsage] = useState<Record<string, VmUsage[]>>({})
   const [selected, setSelected] = useState<string | null>(null)
-  const [draft, setDraft] = useState<VmConfig | null>(null) // new VM that isn't saved yet
+  // the new VM wizard. key makes a second dropped ISO start it over instead of keeping the old choices
+  const [wizard, setWizard] = useState<{ iso?: string; key: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const [unsaved, setUnsaved] = useState(false)
   // VMs that are hibernating: still running for a few seconds, but saving again would fail
   const [hibernating, setHibernating] = useState<Set<string>>(new Set())
   const [setupFor, setSetupFor] = useState<{ vm: VmConfig; reason: string } | null>(null)
-  // bumped for every new draft so its form starts fresh instead of keeping the last one's edits
-  const [draftKey, setDraftKey] = useState(0)
   const [dragging, setDragging] = useState(false)
   const dragDepth = useRef(0) // dragenter/dragleave fire for every child, count them
   const [droppedIso, setDroppedIso] = useState<string | null>(null)
@@ -79,8 +78,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const current = useMemo(() => draft ?? vms.find((v) => v.name === selected) ?? null, [draft, vms, selected])
-  const status: VmStatus = current && !draft ? states[current.name] ?? 'off' : 'off'
+  const current = useMemo(() => vms.find((v) => v.name === selected) ?? null, [vms, selected])
+  const status: VmStatus = current ? states[current.name] ?? 'off' : 'off'
   const latestUsage = useMemo(() => Object.fromEntries(Object.entries(usage).map(([n, h]) => [n, h[h.length - 1]])), [usage])
 
   const guard = async (fn: () => Promise<unknown>, failTitle: string) => {
@@ -94,17 +93,21 @@ export default function App() {
     }
   }
 
-  // read after awaits (an ISO copy can take a while), so it can't come from a stale closure
-  const draftOpen = useRef(false)
-  draftOpen.current = draft !== null
-  /** opens a new draft. Returns false if the user kept the one that is already open */
-  const startDraft = (cfg: VmConfig) => {
-    if (draftOpen.current && !confirm('Discard the new VM you are setting up and start another one?')) return false
-    setDraftKey((k) => k + 1)
-    setDraft(cfg)
-    return true
+  const openWizard = (iso?: string) => setWizard({ iso, key: Date.now() })
+  const onNew = () => openWizard()
+
+  const onCreate = async (cfg: VmConfig) => {
+    try {
+      const saved = await window.vmm.save(cfg)
+      setWizard(null)
+      await refresh()
+      setSelected(saved.name)
+      toasts.push('ok', `Created ${saved.name}`, cfg.iso ? 'Power it on to start the installer.' : undefined)
+    } catch (e) {
+      // the wizard stays open so nothing that was picked is lost
+      toasts.push('error', 'Could not create the VM', errText(e))
+    }
   }
-  const onNew = async () => void startDraft(await window.vmm.newConfig())
 
   // ---- drop an .iso on the window ----
   const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes('Files')
@@ -126,18 +129,14 @@ export default function App() {
       if (mode === 'copy') toasts.push('info', `Copying ${fileName(path)}`, 'Big ISOs take a minute.')
       const final = await window.vmm.importIso(path, mode)
       setHost(await window.vmm.host())
-      // a new VM with the ISO in the drive, sized and named for the OS the file name points at
-      const cfg = await window.vmm.newConfig()
-      const name = suggestName(final, vms.map((v) => v.name))
-      const diskPath = cfg.diskPath.replace(/[^\\/]+$/, `${name}.qcow2`)
-      if (!startDraft({ ...cfg, ...guessPreset(final).values, name, diskPath, iso: final, bootFromIso: true })) toasts.push('ok', `Added ${fileName(final)}`, 'Pick it under CD/DVD on the Hardware tab.')
+      // the wizard starts with this ISO picked and the type guessed from its file name
+      openWizard(final)
     }, 'Could not add the ISO')
   }
 
   const onSave = (cfg: VmConfig, previousName?: string) =>
     guard(async () => {
-      const saved = await window.vmm.save(cfg, draft ? undefined : previousName)
-      setDraft(null)
+      const saved = await window.vmm.save(cfg, previousName)
       await refresh()
       setSelected(saved.name)
       toasts.push('ok', `Saved ${saved.name}`)
@@ -236,7 +235,7 @@ export default function App() {
         <span>Virtual Machine Manager</span>
       </header>
       <Toolbar
-        vm={draft ? null : current}
+        vm={current}
         status={status}
         busy={busy}
         onNew={onNew}
@@ -252,23 +251,20 @@ export default function App() {
           vms={vms}
           states={states}
           usage={latestUsage}
-          selected={draft ? null : selected}
-          draftName={draft?.name ?? null}
-          onSelect={(n) => {
-            setDraft(null)
-            setSelected(n)
-          }}
+          selected={selected}
+          draftName={null}
+          onSelect={setSelected}
         />
         {current ? (
           <VmDetail
-            key={draft ? `__draft${draftKey}` : current.name}
+            key={current.name}
             vm={current}
-            isDraft={Boolean(draft)}
+            isDraft={false}
             status={status}
             host={host}
-            usage={draft ? [] : usage[current.name] ?? []}
+            usage={usage[current.name] ?? []}
             onSave={onSave}
-            onCancelDraft={() => setDraft(null)}
+            onCancelDraft={() => undefined}
             onDelete={onDelete}
             onDirtyChange={setUnsaved}
             toast={toasts.push}
@@ -277,7 +273,7 @@ export default function App() {
         ) : (
           <main className="empty">
             <p className="empty-title">No virtual machines</p>
-            <p>Create one, then pick an installer ISO from your ISOs folder. You can also drop an .iso file here.</p>
+            <p>Create one from an installer ISO. You can also drop an .iso file here.</p>
             <button className="btn primary" onClick={onNew}>
               New virtual machine
             </button>
@@ -286,7 +282,8 @@ export default function App() {
       </div>
       <StatusBar host={host} running={Object.values(states).filter((s) => s !== 'off').length} />
       <Toasts items={toasts.items} dismiss={toasts.dismiss} />
-      {cloning && current && !draft && <CloneDialog source={current.name} taken={vms.map((v) => v.name)} onClone={cloneTo} onClose={() => setCloning(false)} />}
+      {wizard && <Wizard key={wizard.key} host={host} taken={vms.map((v) => v.name)} initialIso={wizard.iso} onCreate={onCreate} onClose={() => setWizard(null)} />}
+      {cloning && current && <CloneDialog source={current.name} taken={vms.map((v) => v.name)} onClone={cloneTo} onClose={() => setCloning(false)} />}
       {setupFor && <GuestSetup vm={setupFor.vm} reason={setupFor.reason} onClose={() => setSetupFor(null)} />}
       {dragging && (
         <div className="drop-overlay" aria-hidden>
@@ -310,7 +307,7 @@ export default function App() {
           }
         >
           <p className="mono">{droppedIso}</p>
-          <p className="muted">Copying keeps the VM working if the original file is moved or deleted. A new VM opens with this ISO in its CD/DVD drive.</p>
+          <p className="muted">Copying keeps the VM working if the original file is moved or deleted. The new VM wizard opens next with this ISO picked.</p>
         </Modal>
       )}
     </div>

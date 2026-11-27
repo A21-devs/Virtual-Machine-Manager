@@ -47,7 +47,7 @@ export function installMockApi(): void {
       totalRamMB: 31744
     }),
     list: async () => [...vms],
-    newConfig: async () => defaultConfig(`New VM ${vms.length + 1}`, disks),
+    newConfig: async (name) => defaultConfig(name?.trim() || `New VM ${vms.length + 1}`, disks),
     save: async (cfg, prev) => {
       if (prev && prev !== cfg.name && profiles[prev]) {
         profiles[cfg.name] = profiles[prev]
@@ -127,6 +127,8 @@ export function installMockApi(): void {
       vms = [...vms, copy]
       return copy
     },
+    // a browser has no file picker that hands out paths
+    pickFile: async () => null,
     importIso: async (path, mode) => {
       await new Promise((r) => setTimeout(r, mode === 'copy' ? 800 : 100))
       const final = mode === 'copy' ? `C:\\Users\\you\\VMs\\ISOs\\${path.split('\\').pop()}` : path

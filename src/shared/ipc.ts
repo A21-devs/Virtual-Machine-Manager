@@ -66,7 +66,8 @@ export interface Profile {
 export interface VmmApi {
   host(): Promise<HostInfo>
   list(): Promise<VmConfig[]>
-  newConfig(): Promise<VmConfig>
+  /** defaults for a new VM. With a name, the disk file is named after it and never one that already exists */
+  newConfig(name?: string): Promise<VmConfig>
   save(cfg: VmConfig, previousName?: string): Promise<VmConfig>
   remove(name: string): Promise<void>
   /** resume: load the save state if the disk has one */
@@ -103,6 +104,8 @@ export interface VmmApi {
   importIso(path: string, mode: 'copy' | 'reference'): Promise<string>
   /** copies a powered-off VM under a new name and returns the new VM's config. linked = share the disk as a base */
   clone(name: string, newName: string, linked: boolean): Promise<VmConfig>
+  /** Windows file picker for an .iso, starting at current or the ISOs folder. null when cancelled */
+  pickFile(current: string, kind: 'iso'): Promise<string | null>
   openDataFolder(): Promise<void>
   openLog(name: string): Promise<void>
   readLog(name: string): Promise<string>
