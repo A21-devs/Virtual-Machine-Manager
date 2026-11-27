@@ -127,6 +127,22 @@ export function installMockApi(): void {
       vms = [...vms, copy]
       return copy
     },
+    diskInfo: async (name) => {
+      const v = vms.find((x) => x.name === name)
+      const size = (v?.diskSizeGB ?? 64) * 1024 ** 3
+      return { exists: true, virtualBytes: size, actualBytes: Math.round(size * 0.31), backingFile: null, snapshotCount: profiles[name]?.length ?? 0 }
+    },
+    resizeDisk: async (name, sizeGB) => {
+      if (running(name)) throw new Error(`Power off ${name} before you resize its disk.`)
+      const v = vms.find((x) => x.name === name)
+      if (v && sizeGB < v.diskSizeGB) throw new Error(`The disk is already ${v.diskSizeGB} GB. It can only grow.`)
+      vms = vms.map((x) => (x.name === name ? { ...x, diskSizeGB: sizeGB } : x))
+    },
+    compactDisk: async (name) => {
+      if (running(name)) throw new Error(`Power off ${name} before you compact its disk.`)
+      await new Promise((r) => setTimeout(r, 1200))
+      return { before: 31 * 1024 ** 3, after: 22 * 1024 ** 3 }
+    },
     // a browser has no file picker that hands out paths
     pickFile: async () => null,
     importIso: async (path, mode) => {

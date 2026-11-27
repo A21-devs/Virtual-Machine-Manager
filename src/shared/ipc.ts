@@ -62,6 +62,19 @@ export interface Profile {
   hasShot: boolean
 }
 
+/** What qemu-img says about a VM's disk file. exists is false before the VM's first boot. */
+export interface DiskInfo {
+  exists: boolean
+  /** the size the guest sees */
+  virtualBytes: number
+  /** what the file takes on the host's drive */
+  actualBytes: number
+  /** set for a linked clone: the shared read-only disk it is built on */
+  backingFile: string | null
+  /** profiles plus the save state, if any. Resize and compact refuse while there are some */
+  snapshotCount: number
+}
+
 /** Everything the renderer can call. Implemented in main/ipc.ts, exposed in preload. */
 export interface VmmApi {
   host(): Promise<HostInfo>
@@ -104,6 +117,11 @@ export interface VmmApi {
   importIso(path: string, mode: 'copy' | 'reference'): Promise<string>
   /** copies a powered-off VM under a new name and returns the new VM's config. linked = share the disk as a base */
   clone(name: string, newName: string, linked: boolean): Promise<VmConfig>
+  diskInfo(name: string): Promise<DiskInfo>
+  /** grows the disk to sizeGB (never shrinks) and saves that size in the config. VM must be off */
+  resizeDisk(name: string, sizeGB: number): Promise<void>
+  /** rewrites the disk to give back space the guest freed. Returns the file size before and after */
+  compactDisk(name: string): Promise<{ before: number; after: number }>
   /** Windows file picker for an .iso, starting at current or the ISOs folder. null when cancelled */
   pickFile(current: string, kind: 'iso'): Promise<string | null>
   openDataFolder(): Promise<void>

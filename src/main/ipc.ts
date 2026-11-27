@@ -1,11 +1,11 @@
 ﻿import { dialog, ipcMain, shell, type BrowserWindow } from 'electron'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { cpus, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { defaultConfig, validPort, type VmConfig } from '@shared/config'
-import type { AutostartIssue, HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
+import type { AutostartIssue, DiskInfo, HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
 import { agentHibernate } from './agent'
-import { cloneVm } from './disks'
+import { cloneVm, compactDisk, resizeDisk } from './disks'
 import { runAutostart } from './autostart'
 import { GuestSetupServer } from './guestSetup'
 import { importIso, listIsos, watchFolder } from './isos'
@@ -102,26 +102,52 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     return saved
   })
 
-  // a full clone reads the disk for minutes, nothing may start or change the VM meanwhile
-  const cloning = new Set<string>()
+  // a full clone or a compact works on the disk for minutes, nothing may start or change the VM
+  // meanwhile. VM name -> what is going on, for the error message
+  const diskWork = new Map<string, string>()
+  const withDiskWork = async <T>(name: string, what: string, fn: () => Promise<T>): Promise<T> => {
+    notBusy(name)
+    diskWork.set(name, what)
+    try {
+      return await fn()
+    } finally {
+      diskWork.delete(name)
+    }
+  }
 
-  // a profile save leaves the VM off for a while before booting it again, and a clone needs it off throughout
+  // a profile save leaves the VM off for a while before booting it again, disk work needs it off throughout
   const notBusy = (name: string) => {
-    if (cloning.has(name)) throw new Error(`${name} is being cloned. Wait for it to finish.`)
+    const work = diskWork.get(name)
+    if (work) throw new Error(`${name} is ${work}. Wait for it to finish.`)
     if (profiles.isBusy(name)) throw new Error(`${name} is busy with a profile. Wait for it to finish.`)
   }
 
   ipcMain.handle('clone', async (_e, name: string, newName: unknown, linked: unknown) => {
-    notBusy(name)
     if (typeof newName !== 'string') throw new Error('Name is required')
-    cloning.add(name)
-    try {
+    return withDiskWork(name, 'being cloned', async () => {
       const copy = await cloneVm(runner, paths, byName(name), newName, linked === true, listConfigs(paths))
       return saveConfig(paths, copy)
-    } finally {
-      cloning.delete(name)
-    }
+    })
   })
+
+  // ---- disk tools ----
+  ipcMain.handle('diskInfo', async (_e, name: string): Promise<DiskInfo> => {
+    const cfg = byName(name)
+    if (!existsSync(cfg.diskPath)) return { exists: false, virtualBytes: 0, actualBytes: 0, backingFile: null, snapshotCount: 0 }
+    // -U reads it even while the VM runs
+    const info = await runner.img().info(cfg.diskPath)
+    return { exists: true, virtualBytes: info.virtualBytes, actualBytes: info.actualBytes, backingFile: info.backingFile, snapshotCount: info.snapshots.length }
+  })
+  ipcMain.handle('resizeDisk', (_e, name: string, sizeGB: unknown) =>
+    withDiskWork(name, 'getting a bigger disk', async () => {
+      const cfg = byName(name)
+      const size = Number(sizeGB)
+      await resizeDisk(runner, cfg, size)
+      // keep the config's size in step, it's what the Hardware tab and the next create use
+      saveConfig(paths, { ...cfg, diskSizeGB: size }, cfg.name)
+    })
+  )
+  ipcMain.handle('compactDisk', (_e, name: string) => withDiskWork(name, 'having its disk compacted', () => compactDisk(runner, byName(name))))
 
   ipcMain.handle('remove', (_e, name: string) => {
     notBusy(name)
