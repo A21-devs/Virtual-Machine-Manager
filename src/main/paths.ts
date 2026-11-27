@@ -30,8 +30,12 @@ export function dataPaths(root = join(homedir(), 'VMs')): DataPaths {
   return p
 }
 
-/** Looks for QEMU in the data folder first, then the normal install locations. */
-export function findQemu(paths: DataPaths): string | null {
+/**
+ * The path from settings if one is set (null if it's gone), otherwise the data folder's
+ * qemu folder, then the normal install location.
+ */
+export function findQemu(paths: DataPaths, override = ''): string | null {
+  if (override) return existsSync(override) ? override : null
   const candidates = [
     join(paths.qemuDir, 'qemu-system-x86_64.exe'),
     'C:\\Program Files\\qemu\\qemu-system-x86_64.exe'
@@ -43,28 +47,32 @@ export function findQemu(paths: DataPaths): string | null {
 export const qemuImgFor = (qemu: string) => join(dirname(qemu), 'qemu-img.exe')
 export const qemuShareFor = (qemu: string) => join(dirname(qemu), 'share')
 
-let versionCache: string | null = null
+// per path: Settings can point at a different QEMU while the app runs
+const versionCache = new Map<string, string>()
 
 export function qemuVersion(qemu: string): Promise<string | null> {
-  if (versionCache) return Promise.resolve(versionCache)
+  if (versionCache.has(qemu)) return Promise.resolve(versionCache.get(qemu) ?? null)
   return new Promise((resolve) => {
     execFile(qemu, ['--version'], { timeout: 5000, windowsHide: true }, (_err, stdout) => {
       const m = /version\s+([\d.]+)/i.exec(String(stdout))
-      versionCache = m ? m[1] : null
-      resolve(versionCache)
+      const v = m ? m[1] : null
+      if (v) versionCache.set(qemu, v) // a failed run (timeout) is tried again next time
+      resolve(v)
     })
   })
 }
 
-let accelCache: 'whpx' | 'tcg' | null = null
+const accelCache = new Map<string, 'whpx' | 'tcg'>()
 
-/** Asks QEMU which accelerators it supports. Cached, it doesn't change while the app runs. */
+/** Asks QEMU which accelerators it supports. Cached per QEMU, it doesn't change while the app runs. */
 export function detectAccel(qemu: string): Promise<'whpx' | 'tcg'> {
-  if (accelCache) return Promise.resolve(accelCache)
+  const known = accelCache.get(qemu)
+  if (known) return Promise.resolve(known)
   return new Promise((resolve) => {
     execFile(qemu, ['-accel', 'help'], { timeout: 5000, windowsHide: true }, (_err, stdout) => {
-      accelCache = /whpx/i.test(String(stdout)) ? 'whpx' : 'tcg'
-      resolve(accelCache)
+      const a = /whpx/i.test(String(stdout)) ? 'whpx' : 'tcg'
+      accelCache.set(qemu, a)
+      resolve(a)
     })
   })
 }
