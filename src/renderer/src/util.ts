@@ -18,3 +18,10 @@ export const statusLabel = {
 
 export const when = (ms: number) =>
   new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+
+/** a file size for people: 512 KB, 340 MB, 12.4 GB */
+export const bytes = (n: number) => {
+  if (n < 1024 ** 2) return `${Math.round(n / 1024)} KB`
+  if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(0)} MB`
+  return `${(n / 1024 ** 3).toFixed(1)} GB`
+}

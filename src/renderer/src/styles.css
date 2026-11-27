@@ -291,6 +291,12 @@ fieldset:disabled input, fieldset:disabled select { color: var(--text-3); }
 .preset.active { border-color: var(--accent); background: var(--accent-bg); }
 .props.compact th, .props.compact td { padding: 5px 0; }
 
+/* ---------- disk tools ---------- */
+.disk-tools { display: flex; flex-direction: column; gap: 8px; }
+.disk-usage { display: flex; flex-direction: column; gap: 4px; max-width: 360px; }
+.bar { height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--accent); }
+
 /* ---------- guest setup ---------- */
 .setup-steps { margin: 8px 0 12px; padding-left: 20px; line-height: 1.6; }
 .setup-cmd { display: block; margin: 6px 0; padding: 8px 10px; background: #0b0b0c; border: 1px solid var(--line-strong); border-radius: var(--r); font-family: 'Cascadia Mono', Consolas, monospace; font-size: 13px; color: var(--text); user-select: all; }
