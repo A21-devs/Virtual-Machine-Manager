@@ -34,11 +34,12 @@ I wanted something that feels like VMware Workstation but is free and fully mine
 - A profile keeps everything that was open in the guest. It's taken while the VM runs, and works for Debian/Ubuntu-based Linux guests today
 
 **Set them up**
+- **New VM wizard:** pick the installer ISO, the OS type and a name. The type is guessed from the ISO's file name (Kali, Parrot, Mint, Ubuntu, Debian, Windows 10 and 11) and fills in sensible CPU, RAM, disk, firmware and disk controller ([wiki](https://github.com/A21-devs/Virtual-Machine-Manager/wiki/Your-first-VM))
 - Hardware tab: name, guest OS, CPU cores and RAM (sliders that know your PC's limits), disk size and controller, CD/DVD image and whether it boots first, network mode and adapter, graphics, BIOS or UEFI, acceleration and extra QEMU arguments
 - **Port forwarding:** reach SSH, RDP or a web server in the guest from your PC, with one-click presets. Forwards only listen on 127.0.0.1, and the editor warns when a port is already taken on your PC ([wiki](https://github.com/A21-devs/Virtual-Machine-Manager/wiki/Port-forwarding))
 - **Clones:** copy a powered-off VM from the toolbar. A linked clone is ready in seconds and shares the original disk as a read-only base, a full clone is an independent copy ([wiki](https://github.com/A21-devs/Virtual-Machine-Manager/wiki/Linked-clones))
 - Hardware can't be changed while a VM is running, and unsaved edits block Power on so nothing runs with half-applied settings
-- **ISOs:** new files in the ISOs folder show up right away, and you can drop an `.iso` anywhere on the window to start a new VM from it (copied into the ISOs folder, or used where it is)
+- **ISOs:** new files in the ISOs folder show up right away, and you can drop an `.iso` anywhere on the window to open the wizard with it (copied into the ISOs folder, or used where it is)
 - Log tab with each VM's QEMU output, for when a guest won't boot
 - Reads VM configs made by the old PowerShell version, so nothing has to be recreated
 
