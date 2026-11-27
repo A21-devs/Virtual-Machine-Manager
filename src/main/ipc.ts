@@ -11,7 +11,7 @@ import { GuestSetupServer } from './guestSetup'
 import { importIso, listIsos, watchFolder } from './isos'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { Profiles } from './profiles'
-import { loadSettings, normalizeSettings, saveSettings } from './settings'
+import { checkDataRoot, loadSettings, normalizeSettings, saveSettings } from './settings'
 import { deleteConfig, freeDiskPath, listConfigs, saveConfig } from './store'
 import { UsageSampler } from './usage'
 import { QUICKSAVE, VmRunner, isPortFree } from './vmRunner'
@@ -284,6 +284,11 @@ export function registerIpc(ctx: IpcContext): Backend {
     const clean = normalizeSettings(s)
     if (clean.qemuPath && !(await checkQemu(clean.qemuPath))) throw new Error("That file doesn't run as QEMU. Pick qemu-system-x86_64.exe from your QEMU folder.")
     const envRoot = process.env.VMM_DATA_ROOT
+    if (!envRoot && clean.dataRoot.toLowerCase() !== paths.root.toLowerCase()) {
+      // a folder the app can't write would stop it from starting after the restart
+      const problem = checkDataRoot(clean.dataRoot)
+      if (problem) throw new Error(problem)
+    }
     // with VMM_DATA_ROOT set (tests, dev runs) the data folder can't be changed here, and the
     // real settings file keeps its own data folder instead of getting the temp one written in
     const saved = saveSettings(ctx.settingsDir, envRoot ? { ...clean, dataRoot: loadSettings(ctx.settingsDir, {}).dataRoot } : clean)

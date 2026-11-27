@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import type { AppSettings } from '@shared/ipc'
 
 /** Kept in Electron's userData folder, not in the data folder, since it says where that is. */
@@ -15,7 +15,8 @@ export const defaultSettings = (): AppSettings => ({
 export function normalizeSettings(raw: unknown): AppSettings {
   const d = defaultSettings()
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
-  const path = (v: unknown) => (typeof v === 'string' && isAbsolute(v.trim()) ? v.trim() : '')
+  // resolve drops a trailing backslash and .. parts, so the same folder always compares equal
+  const path = (v: unknown) => (typeof v === 'string' && isAbsolute(v.trim()) ? resolve(v.trim()) : '')
   return {
     dataRoot: path(r.dataRoot) || d.dataRoot,
     qemuPath: path(r.qemuPath)
@@ -44,4 +45,23 @@ export function saveSettings(dir: string, s: AppSettings): AppSettings {
   writeFileSync(`${file}.tmp`, JSON.stringify(clean, null, 2), 'utf8')
   renameSync(`${file}.tmp`, file)
   return clean
+}
+
+/**
+ * Makes sure the app can use root as its data folder: creates it if needed and writes a
+ * test file. Returns why it can't, or null when it's fine.
+ */
+export function checkDataRoot(root: string): string | null {
+  try {
+    mkdirSync(root, { recursive: true })
+    const probe = join(root, `.vmm-write-test-${process.pid}`)
+    writeFileSync(probe, '')
+    rmSync(probe, { force: true })
+    return null
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code
+    if (code === 'EPERM' || code === 'EACCES') return `Windows doesn't allow writing to ${root}. Pick a folder in your user folder or on another drive.`
+    if (code === 'ENOENT') return `${root} can't be reached. Is the drive plugged in?`
+    return `Can't use ${root}: ${e instanceof Error ? e.message : String(e)}`
+  }
 }

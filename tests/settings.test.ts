@@ -1,9 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { findQemu, dataPaths } from '../src/main/paths'
-import { loadSettings, normalizeSettings, saveSettings } from '../src/main/settings'
+import { checkDataRoot, loadSettings, normalizeSettings, saveSettings } from '../src/main/settings'
 
 const dir = mkdtempSync(join(tmpdir(), 'vmm-settings-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -49,5 +49,25 @@ describe('findQemu', () => {
     expect(findQemu(paths, exe)).toBe(exe)
     // a set path that's gone means QEMU is missing, not "quietly use another one"
     expect(findQemu(paths, join(dir, 'gone', 'qemu-system-x86_64.exe'))).toBeNull()
+  })
+})
+
+describe('checkDataRoot', () => {
+  it('is happy with a folder it can create and write, and leaves no test file behind', () => {
+    const root = join(dir, 'new', 'VMs')
+    expect(checkDataRoot(root)).toBeNull()
+    expect(readdirSync(root)).toEqual([])
+  })
+
+  it('says why when the folder cannot be made', () => {
+    const file = join(dir, 'a-file')
+    writeFileSync(file, '')
+    expect(checkDataRoot(join(file, 'VMs'))).toMatch(/a-file/)
+  })
+})
+
+describe('normalizeSettings paths', () => {
+  it('treats a trailing backslash as the same folder', () => {
+    expect(normalizeSettings({ dataRoot: join(dir, 'VMs') + '\\' }).dataRoot).toBe(join(dir, 'VMs'))
   })
 })
