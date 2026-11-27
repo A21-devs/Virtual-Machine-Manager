@@ -37,18 +37,16 @@ export async function compactDisk(runner: VmRunner, cfg: VmConfig): Promise<{ be
   if (info.snapshots.length > 0) throw new Error(`Compacting would throw away this VM's ${snapshotWord(info.snapshots)}. Delete it first if you really want to.`)
   if (info.backingFile) throw new Error('This disk is a linked clone. Compacting it would copy the whole base disk into it.')
   const tmp = `${cfg.diskPath}.compact.tmp`
-  const old = `${cfg.diskPath}.old`
   rmSync(tmp, { force: true })
   try {
     await img.convert(cfg.diskPath, tmp)
+    // one rename that replaces the disk. With two (disk -> .old, tmp -> disk) a crash in between
+    // leaves no file at diskPath, and the next Power on would create a blank disk there
+    renameSync(tmp, cfg.diskPath)
   } catch (e) {
-    rmSync(tmp, { force: true })
+    rmSync(tmp, { force: true }) // the original is untouched
     throw e
   }
-  // two renames, so a complete copy is on disk at every moment
-  renameSync(cfg.diskPath, old)
-  renameSync(tmp, cfg.diskPath)
-  rmSync(old, { force: true })
   return { before: info.actualBytes, after: (await img.info(cfg.diskPath)).actualBytes }
 }
 
