@@ -127,6 +127,8 @@ export function installMockApi(): void {
       vms = [...vms, copy]
       return copy
     },
+    // a browser has no file picker that hands out paths
+    pickFile: async () => null,
     importIso: async (path, mode) => {
       await new Promise((r) => setTimeout(r, mode === 'copy' ? 800 : 100))
       const final = mode === 'copy' ? `C:\\Users\\you\\VMs\\ISOs\\${path.split('\\').pop()}` : path

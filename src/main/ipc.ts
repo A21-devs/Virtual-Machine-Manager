@@ -1,4 +1,4 @@
-﻿import { ipcMain, shell, type BrowserWindow } from 'electron'
+﻿import { dialog, ipcMain, shell, type BrowserWindow } from 'electron'
 import { readFileSync } from 'node:fs'
 import { cpus, totalmem } from 'node:os'
 import { join } from 'node:path'
@@ -65,6 +65,14 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
   ipcMain.handle('importIso', (_e, path: string, mode: 'copy' | 'reference') => importIso(path, paths.isos, mode))
 
   ipcMain.handle('list', () => listConfigs(paths))
+
+  ipcMain.handle('pickFile', async (_e, current: string, kind: 'iso') => {
+    if (kind !== 'iso') throw new Error(`Unknown file kind: ${String(kind)}`)
+    const win = getWindow()
+    const opts = { defaultPath: current || paths.isos, properties: ['openFile' as const], filters: [{ name: 'Disc images', extensions: ['iso'] }] }
+    const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    return r.canceled ? null : r.filePaths[0] ?? null
+  })
 
   ipcMain.handle('newConfig', () => {
     const taken = new Set(listConfigs(paths).map((c) => c.name.toLowerCase()))

@@ -103,6 +103,8 @@ export interface VmmApi {
   importIso(path: string, mode: 'copy' | 'reference'): Promise<string>
   /** copies a powered-off VM under a new name and returns the new VM's config. linked = share the disk as a base */
   clone(name: string, newName: string, linked: boolean): Promise<VmConfig>
+  /** Windows file picker for an .iso, starting at current or the ISOs folder. null when cancelled */
+  pickFile(current: string, kind: 'iso'): Promise<string | null>
   openDataFolder(): Promise<void>
   openLog(name: string): Promise<void>
   readLog(name: string): Promise<string>
