@@ -1,9 +1,9 @@
 ﻿import { dialog, ipcMain, shell, type BrowserWindow } from 'electron'
 import { existsSync, readFileSync } from 'node:fs'
 import { cpus, totalmem } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { defaultConfig, validPort, type VmConfig } from '@shared/config'
-import type { AutostartIssue, DiskInfo, HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
+import type { AppSettings, AutostartIssue, DiskInfo, HostInfo, PowerAction, Profile, SaveStateResult, StartResult } from '@shared/ipc'
 import { agentHibernate } from './agent'
 import { cloneVm, compactDisk, resizeDisk } from './disks'
 import { runAutostart } from './autostart'
@@ -11,6 +11,7 @@ import { GuestSetupServer } from './guestSetup'
 import { importIso, listIsos, watchFolder } from './isos'
 import { detectAccel, findQemu, qemuVersion, type DataPaths } from './paths'
 import { Profiles } from './profiles'
+import { loadSettings, normalizeSettings, saveSettings } from './settings'
 import { deleteConfig, freeDiskPath, listConfigs, saveConfig } from './store'
 import { UsageSampler } from './usage'
 import { QUICKSAVE, VmRunner, isPortFree } from './vmRunner'
@@ -25,8 +26,23 @@ export interface Backend {
   dispose: () => void
 }
 
-export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | null): Backend {
-  const runner = new VmRunner(paths, () => findQemu(paths))
+/** What the IPC layer needs from the app around it. */
+export interface IpcContext {
+  paths: DataPaths
+  getWindow: () => BrowserWindow | null
+  /** Electron's userData folder, where settings.json lives */
+  settingsDir: string
+  getSettings: () => AppSettings
+  setSettings: (s: AppSettings) => void
+  /** restarts the app, used after the data folder changes */
+  relaunch: () => void
+}
+
+export function registerIpc(ctx: IpcContext): Backend {
+  const { paths, getWindow } = ctx
+  // read on every call, so a QEMU path saved in Settings is used from the next start on
+  const qemu = () => findQemu(paths, ctx.getSettings().qemuPath)
+  const runner = new VmRunner(paths, qemu)
   const guestSetup = new GuestSetupServer()
   const profiles = new Profiles(paths, runner)
 
@@ -48,7 +64,7 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
   }
 
   ipcMain.handle('host', async (): Promise<HostInfo> => {
-    const qemuPath = findQemu(paths)
+    const qemuPath = qemu()
     const isos = listIsos(paths.isos, listConfigs(paths))
     return {
       qemuPath,
@@ -66,10 +82,11 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
 
   ipcMain.handle('list', () => listConfigs(paths))
 
-  ipcMain.handle('pickFile', async (_e, current: string, kind: 'iso') => {
-    if (kind !== 'iso') throw new Error(`Unknown file kind: ${String(kind)}`)
+  ipcMain.handle('pickFile', async (_e, current: string, kind: 'iso' | 'qemu') => {
+    if (kind !== 'iso' && kind !== 'qemu') throw new Error(`Unknown file kind: ${String(kind)}`)
     const win = getWindow()
-    const opts = { defaultPath: current || paths.isos, properties: ['openFile' as const], filters: [{ name: 'Disc images', extensions: ['iso'] }] }
+    const filters = kind === 'iso' ? [{ name: 'Disc images', extensions: ['iso'] }] : [{ name: 'QEMU', extensions: ['exe'] }]
+    const opts = { defaultPath: current || (kind === 'iso' ? paths.isos : undefined), properties: ['openFile' as const], filters }
     const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
     return r.canceled ? null : r.filePaths[0] ?? null
   })
@@ -261,6 +278,33 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
     }
   })
 
+  // ---- settings ----
+  ipcMain.handle('settings', () => ctx.getSettings())
+  ipcMain.handle('saveSettings', async (_e, s: AppSettings) => {
+    const clean = normalizeSettings(s)
+    if (clean.qemuPath && !(await checkQemu(clean.qemuPath))) throw new Error("That file doesn't run as QEMU. Pick qemu-system-x86_64.exe from your QEMU folder.")
+    const envRoot = process.env.VMM_DATA_ROOT
+    // with VMM_DATA_ROOT set (tests, dev runs) the data folder can't be changed here, and the
+    // real settings file keeps its own data folder instead of getting the temp one written in
+    const saved = saveSettings(ctx.settingsDir, envRoot ? { ...clean, dataRoot: loadSettings(ctx.settingsDir, {}).dataRoot } : clean)
+    ctx.setSettings(envRoot ? { ...saved, dataRoot: envRoot } : saved)
+    // the data folder is read once at startup, the QEMU path applies from the next start on
+    return { restartNeeded: !envRoot && saved.dataRoot.toLowerCase() !== paths.root.toLowerCase() }
+  })
+  ipcMain.handle('checkQemu', (_e, path: unknown) => (typeof path === 'string' ? checkQemu(path) : null))
+  ipcMain.handle('pickFolder', async (_e, current: string) => {
+    const win = getWindow()
+    const opts = { defaultPath: current || undefined, properties: ['openDirectory' as const, 'createDirectory' as const] }
+    const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    return r.canceled ? null : r.filePaths[0] ?? null
+  })
+  ipcMain.handle('relaunch', () => {
+    // a restart would kill running VMs, so it's refused instead
+    const running = listConfigs(paths).filter((c) => runner.isRunning(c.name)).map((c) => c.name)
+    if (running.length) throw new Error(`Power off ${running.join(', ')} first, a restart would cut ${running.length === 1 ? 'it' : 'them'} off.`)
+    ctx.relaunch()
+  })
+
   return {
     runner,
     configs: () => listConfigs(paths),
@@ -270,4 +314,10 @@ export function registerIpc(paths: DataPaths, getWindow: () => BrowserWindow | n
       usage.stop()
     }
   }
+}
+
+/** The QEMU version if path is a qemu-system-x86_64.exe that runs, otherwise null. */
+async function checkQemu(path: string): Promise<string | null> {
+  if (!isAbsolute(path) || !/qemu-system-x86_64(\.exe)?$/i.test(path) || !existsSync(path)) return null
+  return qemuVersion(path)
 }

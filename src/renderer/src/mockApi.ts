@@ -1,7 +1,7 @@
 ﻿// Fake backend so the UI can run in a normal browser (npm run dev:web).
 // Handy for working on layout without booting real VMs.
 import { defaultConfig, type VmConfig } from '@shared/config'
-import type { Profile, VmmApi, VmRuntimeState, VmUsage } from '@shared/ipc'
+import type { AppSettings, Profile, VmmApi, VmRuntimeState, VmUsage } from '@shared/ipc'
 
 // a gray "desktop" so the preview and profile thumbnails have something to show
 function fakeScreen(label: string): string {
@@ -36,12 +36,16 @@ export function installMockApi(): void {
   const agentReady = new Set<string>()
   const isos = ['C:\\Users\\you\\VMs\\ISOs\\kali-linux-2026.2-installer-amd64.iso', 'C:\\Users\\you\\VMs\\ISOs\\Parrot-home-7.3_amd64.iso']
 
+  const startRoot = 'C:\\Users\\you\\VMs'
+  let settings: AppSettings = { dataRoot: startRoot, qemuPath: '' }
+  const looksLikeQemu = (p: string) => /qemu-system-x86_64\.exe$/i.test(p)
+
   const api: VmmApi = {
     host: async () => ({
-      qemuPath: 'C:\\Users\\you\\VMs\\qemu\\qemu-system-x86_64.exe',
+      qemuPath: settings.qemuPath || 'C:\\Users\\you\\VMs\\qemu\\qemu-system-x86_64.exe',
       qemuVersion: '11.1.0',
       accel: 'whpx',
-      dataRoot: 'C:\\Users\\you\\VMs',
+      dataRoot: startRoot, // like the real app, a new data folder is only used after a restart
       isos: [...isos],
       cpuCount: 24,
       totalRamMB: 31744
@@ -145,6 +149,18 @@ export function installMockApi(): void {
     },
     // a browser has no file picker that hands out paths
     pickFile: async () => null,
+    pickFolder: async () => null,
+    settings: async () => ({ ...settings }),
+    saveSettings: async (s) => {
+      if (s.qemuPath && !looksLikeQemu(s.qemuPath)) throw new Error("That file doesn't run as QEMU. Pick qemu-system-x86_64.exe from your QEMU folder.")
+      settings = { ...s }
+      return { restartNeeded: s.dataRoot.toLowerCase() !== startRoot.toLowerCase() }
+    },
+    checkQemu: async (p) => (looksLikeQemu(p) ? '11.1.0' : null),
+    relaunch: async () => {
+      if (Object.values(states).some((s) => s.status !== 'off')) throw new Error('Power off the running VMs first, a restart would cut them off.')
+      location.reload()
+    },
     importIso: async (path, mode) => {
       await new Promise((r) => setTimeout(r, mode === 'copy' ? 800 : 100))
       const final = mode === 'copy' ? `C:\\Users\\you\\VMs\\ISOs\\${path.split('\\').pop()}` : path

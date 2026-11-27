@@ -1,7 +1,9 @@
 ﻿import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
+import type { AppSettings } from '@shared/ipc'
 import { registerIpc, type Backend } from './ipc'
 import { dataPaths } from './paths'
+import { loadSettings } from './settings'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -40,9 +42,22 @@ function createWindow(): void {
 }
 
 let backend: Backend | null = null
+let settings: AppSettings
 
 app.whenReady().then(() => {
-  backend = registerIpc(dataPaths(), () => mainWindow)
+  const settingsDir = app.getPath('userData')
+  settings = loadSettings(settingsDir)
+  backend = registerIpc({
+    paths: dataPaths(settings.dataRoot),
+    getWindow: () => mainWindow,
+    settingsDir,
+    getSettings: () => settings,
+    setSettings: (s) => (settings = s),
+    relaunch: () => {
+      app.relaunch()
+      app.quit() // before-quit still stops the folder watcher and the usage sampler
+    }
+  })
   app.on('before-quit', () => {
     backend?.dispose()
     backend?.runner.killAll()
