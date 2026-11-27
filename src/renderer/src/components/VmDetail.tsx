@@ -24,6 +24,8 @@ interface Props {
   onDirtyChange: (dirty: boolean) => void
   toast: PushToast
   onNeedsSetup: (reason: string) => void
+  /** Grow disk saved a new size, reload the library */
+  onDiskChanged: () => void
 }
 
 type Tab = 'summary' | 'hardware' | 'profiles' | 'log'
@@ -43,7 +45,7 @@ export default function VmDetail(props: Props) {
   const dirty = isDraft || JSON.stringify(form) !== JSON.stringify(vm)
   const nameError = validateVmName(form.name)
   const diskError =
-    !Number.isInteger(form.diskSizeGB) || form.diskSizeGB < 5 || form.diskSizeGB > 4096 ? 'Pick a whole number from 5 to 4096 GB' : null
+    !Number.isInteger(form.diskSizeGB) || form.diskSizeGB < 5 || form.diskSizeGB > 16384 ? 'Pick a whole number from 5 to 16384 GB' : null
   const forwardsInvalid = form.forwards.some((_f, i) => forwardError(form.forwards, i) !== null)
 
   // the toolbar lives in App, it needs to know when Power on would ignore unsaved edits
@@ -94,6 +96,10 @@ export default function VmDetail(props: Props) {
             onSave={() => onSave(form, vm.name)}
             onRevert={() => (isDraft ? onCancelDraft() : setForm(vm))}
             onDelete={() => onDelete(vm.name)}
+            vm={vm}
+            status={status}
+            toast={props.toast}
+            onDiskChanged={props.onDiskChanged}
           />
         )}
         {tab === 'profiles' && <Profiles vm={vm} status={status} toast={props.toast} onNeedsSetup={props.onNeedsSetup} />}
