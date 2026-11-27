@@ -34,7 +34,7 @@ export async function compactDisk(runner: VmRunner, cfg: VmConfig): Promise<{ be
   const img = runner.img()
   const info = await img.info(cfg.diskPath)
   // convert doesn't copy internal snapshots, they would be gone afterwards
-  if (info.snapshots.length > 0) throw new Error(`Compacting would throw away this VM's ${snapshotWord(info.snapshots)}. Delete it first if you really want to.`)
+  if (info.snapshots.length > 0) throw new Error(`Compacting would throw away this VM's ${snapshotWord(info.snapshots)}. Delete them first if you really want to.`)
   if (info.backingFile) throw new Error('This disk is a linked clone. Compacting it would copy the whole base disk into it.')
   const tmp = `${cfg.diskPath}.compact.tmp`
   rmSync(tmp, { force: true })
