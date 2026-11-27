@@ -62,6 +62,14 @@ export interface Profile {
   hasShot: boolean
 }
 
+/** App-wide settings, from settings.json in Electron's userData folder */
+export interface AppSettings {
+  /** where vms, disks, ISOs, logs and profiles live */
+  dataRoot: string
+  /** full path to qemu-system-x86_64.exe, '' = find it automatically */
+  qemuPath: string
+}
+
 /** What qemu-img says about a VM's disk file. exists is false before the VM's first boot. */
 export interface DiskInfo {
   exists: boolean
@@ -122,8 +130,17 @@ export interface VmmApi {
   resizeDisk(name: string, sizeGB: number): Promise<void>
   /** rewrites the disk to give back space the guest freed. Returns the file size before and after */
   compactDisk(name: string): Promise<{ before: number; after: number }>
-  /** Windows file picker for an .iso, starting at current or the ISOs folder. null when cancelled */
-  pickFile(current: string, kind: 'iso'): Promise<string | null>
+  /** Windows file picker for an .iso (starts in the ISOs folder) or QEMU's .exe. null when cancelled */
+  pickFile(current: string, kind: 'iso' | 'qemu'): Promise<string | null>
+  /** folder picker, null when cancelled */
+  pickFolder(current: string): Promise<string | null>
+  settings(): Promise<AppSettings>
+  /** a bad QEMU path is refused. restartNeeded: the data folder changed, it's used after relaunch() */
+  saveSettings(s: AppSettings): Promise<{ restartNeeded: boolean }>
+  /** the QEMU version at that path, null if it isn't a QEMU that runs */
+  checkQemu(path: string): Promise<string | null>
+  /** restarts the app. Refused while VMs are running */
+  relaunch(): Promise<void>
   openDataFolder(): Promise<void>
   openLog(name: string): Promise<void>
   readLog(name: string): Promise<string>
