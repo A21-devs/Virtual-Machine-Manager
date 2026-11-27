@@ -269,6 +269,7 @@ export default function App() {
             onDirtyChange={setUnsaved}
             toast={toasts.push}
             onNeedsSetup={(reason) => setSetupFor({ vm: current, reason })}
+            onDiskChanged={refresh}
           />
         ) : (
           <main className="empty">

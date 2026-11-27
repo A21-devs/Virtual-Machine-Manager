@@ -1,8 +1,10 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import type { VmConfig } from '@shared/config'
-import type { HostInfo } from '@shared/ipc'
+import type { HostInfo, VmStatus } from '@shared/ipc'
 import { fileName, gb } from '../util'
+import DiskTools from './DiskTools'
 import PortForwards from './PortForwards'
+import type { PushToast } from './Toasts'
 
 interface Props {
   form: VmConfig
@@ -18,9 +20,15 @@ interface Props {
   onSave: () => void
   onRevert: () => void
   onDelete: () => void
+  /** the saved config, the disk tools work on what is on disk, not the form */
+  vm: VmConfig
+  status: VmStatus
+  toast: PushToast
+  onDiskChanged: () => void
 }
 
-export default function Hardware({ form, setForm, host, locked, isDraft, dirty, nameError, diskError, forwardsInvalid, onSave, onRevert, onDelete }: Props) {
+export default function Hardware(props: Props) {
+  const { form, setForm, host, locked, isDraft, dirty, nameError, diskError, forwardsInvalid, onSave, onRevert, onDelete } = props
   const set = <K extends keyof VmConfig>(k: K, v: VmConfig[K]) => setForm((f) => ({ ...f, [k]: v }))
   const maxRam = host ? Math.max(1024, Math.floor((host.totalRamMB - 2048) / 512) * 512) : 32768
   const maxCpu = host?.cpuCount ?? 16
@@ -58,12 +66,12 @@ export default function Hardware({ form, setForm, host, locked, isDraft, dirty, 
         </Group>
 
         <Group title="Storage">
-          <Row label="Disk size" error={diskError} hint={isDraft ? 'grows as the guest writes, up to this size' : 'only used when the disk file is created'}>
+          <Row label="Disk size" error={diskError} hint={isDraft ? 'grows as the guest writes, up to this size' : 'only used when the disk file is created. Grow an existing disk below'}>
             <div className="with-unit">
               <input
                 type="number"
                 min={5}
-                max={4096}
+                max={16384}
                 aria-invalid={Boolean(diskError)}
                 value={Number.isNaN(form.diskSizeGB) ? '' : form.diskSizeGB}
                 onChange={(e) => set('diskSizeGB', e.target.value === '' ? Number.NaN : Number(e.target.value))}
@@ -78,6 +86,11 @@ export default function Hardware({ form, setForm, host, locked, isDraft, dirty, 
               <option value="ide">IDE</option>
             </select>
           </Row>
+          {!isDraft && (
+            <Row label="Disk file">
+              <DiskTools vm={props.vm} status={props.status} dirty={dirty} toast={props.toast} onChanged={props.onDiskChanged} />
+            </Row>
+          )}
           <Row label="CD/DVD">
             <select value={form.iso} onChange={(e) => set('iso', e.target.value)}>
               <option value="">Empty</option>
