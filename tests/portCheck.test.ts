@@ -22,8 +22,9 @@ describe('isPortFree', () => {
     const port = sock.address().port
     try {
       expect(await isPortFree(port, 'udp')).toBe(false)
-      // tcp and udp ports are separate, the tcp side of it is still free
-      expect(await isPortFree(port, 'tcp')).toBe(true)
+      // Do not assume the TCP side of this port is free: binding UDP on port 0
+      // only reserves the UDP port, and the OS may hand the same number to a
+      // TCP socket from the shared ephemeral range on this machine.
     } finally {
       await new Promise<void>((r) => sock.close(() => r()))
     }
